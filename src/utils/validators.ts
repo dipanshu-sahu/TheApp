@@ -5,9 +5,11 @@ type ValidationField =
   | 'newPassword'
   | 'firstName'
   | 'lastName'
+  | 'fullName'
   | 'phoneNumber'
   | 'type'
-  | 'confirmPassword';
+  | 'confirmPassword'
+  | 'otp';
 
 type ValidationContext = Partial<Record<ValidationField, string>>;
 
@@ -67,6 +69,20 @@ const validators: Record<ValidationField, ValidatorFn> = {
     }
     return '';
   },
+  fullName: value => {
+    const trimmedValue = value?.trim?.() ?? '';
+    if (!trimmedValue) {
+      return 'Full name is required';
+    }
+    if (!nameRegex.test(trimmedValue)) {
+      return 'Enter a valid full name';
+    }
+    const parts = trimmedValue.split(/\s+/).filter(Boolean);
+    if (parts.length < 2) {
+      return 'Enter first and last name';
+    }
+    return '';
+  },
   phoneNumber: value => {
     const trimmedValue = value?.trim?.() ?? '';
     if (!trimmedValue) {
@@ -93,6 +109,16 @@ const validators: Record<ValidationField, ValidatorFn> = {
     }
     if (value !== context?.password) {
       return 'Passwords do not match';
+    }
+    return '';
+  },
+  otp: value => {
+    const trimmedValue = value?.trim?.() ?? '';
+    if (!trimmedValue) {
+      return 'Verification code is required';
+    }
+    if (!/^\d{6}$/.test(trimmedValue)) {
+      return 'Enter a valid 6-digit code';
     }
     return '';
   },

@@ -1,6 +1,7 @@
 import {
     ActionReducerMapBuilder,
     AsyncThunk,
+    Draft,
     PayloadAction,
 } from '@reduxjs/toolkit';
 
@@ -21,12 +22,13 @@ export const addAsyncCases = <
     Returned,
     ThunkArg,
     ApiKey extends keyof State,
-    DataKey extends keyof State
+    DataKey extends keyof State = never,
 >(
     builder: ActionReducerMapBuilder<State>,
     thunk: AsyncThunk<Returned, ThunkArg, any>,
     apiKey: ApiKey,
-    dataKey?: DataKey
+    dataKey?: DataKey,
+    onFulfilled?: (state: Draft<State>, action: PayloadAction<Returned>) => void,
 ) => {
     builder
 
@@ -46,15 +48,13 @@ export const addAsyncCases = <
 
                 apiState.loading = false;
 
-                // shared state update
                 if (dataKey) {
                     state[dataKey] = action.payload as State[DataKey];
-                }
-
-                // local api state update
-                else {
+                } else if (!onFulfilled) {
                     apiState.data = action.payload;
                 }
+
+                onFulfilled?.(state, action);
             }
         )
 

@@ -40,6 +40,22 @@ export type userResetPasswordRequest = {
   confirmPassword: string;
 };
 
+export type forgotPasswordOtpRequest = {
+  email: string;
+};
+
+export type verifyForgotPasswordOtpRequest = {
+  email: string;
+  otp: string;
+};
+
+export type resetPasswordWithOtpRequest = {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
 export type userChangePasswordRequest = {
   currentPassword: string;
   newPassword: string;

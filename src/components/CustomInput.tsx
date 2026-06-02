@@ -9,17 +9,17 @@ import {
 } from 'react-native';
 import { colors } from '../themes/colors';
 import { textFont } from '../utils/textFont';
-import { MailIcon, EyeOpenIcon, EyeCloseIcon } from '../assets/icons';
+import Icon, { IconName } from './Icon';
 
 interface CustomInputProps extends TextInputProps {
-  InputIcon?: React.ComponentType<{ height: number; width: number }>;
+  icon?: IconName;
   isPassword?: boolean;
   placeholder?: string;
   errorMessage?: string;
 }
 
 const CustomInput: React.FC<CustomInputProps> = ({
-  InputIcon = MailIcon,
+  icon = 'mail',
   isPassword = false,
   placeholder,
   errorMessage,
@@ -30,7 +30,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
   return (
     <View style={styles.wrapper}>
       <View style={[styles.container, hasError && styles.containerError]}>
-        <InputIcon height={24} width={24} />
+        <Icon name={icon} size={24} />
         <TextInput
           numberOfLines={1}
           style={styles.input}
@@ -41,11 +41,10 @@ const CustomInput: React.FC<CustomInputProps> = ({
         />
         {isPassword && (
           <TouchableOpacity onPress={() => setSecureText(!secureText)}>
-            {secureText ? (
-              <EyeCloseIcon height={24} width={24} />
-            ) : (
-              <EyeOpenIcon height={24} width={24} />
-            )}
+            <Icon
+              name={secureText ? 'eye-close' : 'eye-open'}
+              size={24}
+            />
           </TouchableOpacity>
         )}
       </View>

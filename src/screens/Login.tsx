@@ -1,22 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 
 import { colors } from '../themes/colors';
 import { textFont } from '../utils/textFont';
-import { MailIcon, PasswordLockIcon } from '../assets/icons';
-import CustomInput from '../components/CustomInput';
 import Gap from '../components/Gap';
-import ActionButton from '../components/ActionButton';
-import BackButtonHeader from '../components/BackButtonHeader';
-import axios from '../apis/axios';
+import GradientButton from '../components/GradientButton';
+import AuthHeader from '../components/auth/AuthHeader';
+import AuthInput from '../components/auth/AuthInput';
 import { userLogin } from '../slices/userSlice';
 import { AppDispatch } from '../store/store';
 import { userLoginRequest } from '../types/user';
 import { validateField, isFieldValid } from '../utils/validators';
-import { getStorage, STORAGE_KEYS } from '../utils/storage';
 
 const Login = () => {
   const navigation = useNavigation();
@@ -30,13 +35,6 @@ const Login = () => {
   });
   const [formError, setFormError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  useEffect(() => {
-    const storedToken = getStorage(STORAGE_KEYS.authToken);
-    if (typeof storedToken === 'string' && storedToken.length > 0) {
-      axios.defaults.headers.common['Authorization'] = storedToken;
-    }
-  }, []);
 
   const clearFieldError = (field: 'email' | 'password') => {
     if (errors[field]) {
@@ -91,31 +89,37 @@ const Login = () => {
     } catch (error) {
       setFormError(extractErrorMessage(error));
     } finally {
-      navigation.navigate('App' as never);
       setIsSubmitting(false);
     }
   };
 
-  const isEnabled = () => {
-    return (
-      isFieldValid('email', email) &&
-      isFieldValid('password', password) &&
-      !isSubmitting
-    );
-  };
+  const isEnabled = () =>
+    isFieldValid('email', email) &&
+    isFieldValid('password', password) &&
+    !isSubmitting;
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={{ flex: 1, padding: 16 }}>
-        <BackButtonHeader />
-        <Text style={{ ...textFont.boldXL, color: colors.textPrimary }}>
-          Smart Home Welcome
-        </Text>
-        <View style={{ marginTop: 32 }}>
-          <CustomInput
-            InputIcon={MailIcon}
-            placeholder="Email"
-            maxLength={30}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <AuthHeader
+            variant="login"
+            title="Welcome Back 👋"
+            subtitle="Sign in to control your smart home"
+          />
+
+          <AuthInput
+            label="Email Address"
+            icon="mail"
+            placeholder="rahul@example.com"
+            maxLength={50}
             value={email}
             onChangeText={value => {
               setEmail(value);
@@ -125,10 +129,11 @@ const Login = () => {
             autoCapitalize="none"
             errorMessage={errors.email}
           />
-          <Gap type="m" />
-          <CustomInput
-            InputIcon={PasswordLockIcon}
-            placeholder="Password"
+
+          <AuthInput
+            label="Password"
+            icon="password-lock"
+            placeholder="Enter password"
             isPassword
             maxLength={30}
             value={password}
@@ -138,31 +143,38 @@ const Login = () => {
             }}
             errorMessage={errors.password}
           />
-          <Gap type="l" />
+
           <TouchableOpacity
+            style={styles.forgotPassword}
             onPress={() => navigation.navigate('ForgotPassword' as never)}
           >
-            <Text style={{ ...textFont.regularM, color: colors.textPrimary }}>
-              Forgot Password?
-            </Text>
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
-        </View>
-      </View>
-      <View style={{ padding: 16 }}>
-        {formError ? (
-          <>
-            <Text style={{ ...textFont.regularS, color: colors.error }}>
-              {formError}
-            </Text>
-            <Gap type="s" />
-          </>
-        ) : null}
-        <ActionButton
-          title="Log In"
-          onPress={handleLogin}
-          isDisable={!isEnabled()}
-        />
-      </View>
+
+          {formError ? (
+            <>
+              <Text style={styles.formError}>{formError}</Text>
+              <Gap type="s" />
+            </>
+          ) : null}
+
+          <GradientButton
+            title="Sign In"
+            onPress={handleLogin}
+            isDisable={!isEnabled()}
+            tone="primary"
+          />
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don&apos;t have an account? </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SignUp' as never)}
+            >
+              <Text style={styles.footerLink}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -172,5 +184,42 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgPrimary,
   },
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginTop: -6,
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    ...textFont.regularM,
+    color: colors.link,
+  },
+  formError: {
+    ...textFont.regularS,
+    color: colors.error,
+    marginBottom: 8,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 24,
+  },
+  footerText: {
+    ...textFont.regularM,
+    color: colors.textSecondary,
+  },
+  footerLink: {
+    ...textFont.boldM,
+    color: colors.link,
+  },
 });
+
 export default Login;

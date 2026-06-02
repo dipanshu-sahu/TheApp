@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="160" viewBox="0 0 400 160" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="weatherGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A2F5C"/>
+      <stop offset="100%" stop-color="#243B6B"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="160" rx="20" fill="url(#weatherGrad)"/>
+</svg>

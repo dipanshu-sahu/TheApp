@@ -2,6 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { textFont } from '../utils/textFont';
 import { colors } from '../themes/colors';
+import GradientButton from './GradientButton';
 
 interface ActionButtonProps {
   title: string;
@@ -9,6 +10,7 @@ interface ActionButtonProps {
   textColor?: string;
   onPress?: () => void;
   isDisable?: boolean;
+  variant?: 'gradient' | 'solid';
 }
 
 const ActionButton: React.FC<ActionButtonProps> = ({
@@ -17,18 +19,27 @@ const ActionButton: React.FC<ActionButtonProps> = ({
   textColor = colors.textPrimary,
   onPress,
   isDisable,
-}) => (
-  <TouchableOpacity
-    style={[
-      styles.button,
-      { backgroundColor: isDisable ? colors.lineGrey : bgColor },
-    ]}
-    onPress={onPress}
-    disabled={isDisable}
-  >
-    <Text style={{ ...textFont.regularS, color: textColor }}>{title}</Text>
-  </TouchableOpacity>
-);
+  variant = 'gradient',
+}) => {
+  if (variant === 'gradient') {
+    return (
+      <GradientButton title={title} onPress={onPress} isDisable={isDisable} />
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.button,
+        { backgroundColor: isDisable ? colors.lineGrey : bgColor },
+      ]}
+      onPress={onPress}
+      disabled={isDisable}
+    >
+      <Text style={{ ...textFont.regularS, color: textColor }}>{title}</Text>
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   button: {

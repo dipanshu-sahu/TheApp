@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import TcpSocket from 'react-native-tcp-socket';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,20 +19,22 @@ import ToastManager, { Toast } from 'toastify-react-native';
 import { colors } from '../themes/colors';
 import Gap from '../components/Gap';
 import { textFont } from '../utils/textFont';
-import {
-  ArrowDownIcon,
-  ArrowNextIcon,
-  CloseIcon,
-  PasswordLockIcon,
-} from '../assets/icons';
+import Icon from '../components/Icon';
 import BackButtonHeader from '../components/BackButtonHeader';
 import CustomInput from '../components/CustomInput';
 import ActionButton from '../components/ActionButton';
-import { useNavigation } from '@react-navigation/native';
+import {
+  RouteProp,
+  useNavigation,
+  useRoute,
+  CommonActions,
+} from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store/store';
 import { addDevice } from '../slices/deviceSlice';
 import { AddDeviceRequest } from '../types/device';
+import { MyHomeStackParamList } from '../navigation';
 
 enum ProvisioningStep {
   eResponse_D2A_Provision = 300,
@@ -44,33 +47,61 @@ enum ProvisioningStep {
   eInvalid_Provision,
 }
 
+type SetupStep = 'device_password' | 'connecting' | 'select_wifi' | 'provisioning';
+
 const AddDevice = () => {
-  const navigation = useNavigation();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<MyHomeStackParamList>>();
+  const route = useRoute<RouteProp<MyHomeStackParamList, 'AddDevice'>>();
   const dispatch = useDispatch<AppDispatch>();
+  const routeParams = route.params;
 
   const [wifiList, setWifiList] = useState<WifiEntry[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<WifiEntry>();
-  const [selectedWifiPassword, setSelectedWifiPassword] = useState<string>('');
-  const [deviceConnectedSuccess, setDeviceConnectedSuccess] =
-    useState<boolean>(false);
-  const [selectedDevicePassword, setSelectedDevicePassword] =
-    useState<string>('');
+  const [modalVisible, setModalVisible] = useState(true);
+  const [setupStep, setSetupStep] = useState<SetupStep>('device_password');
+  const [selectedDevicePassword, setSelectedDevicePassword] = useState('');
+  const [selectedWifiPassword, setSelectedWifiPassword] = useState('');
   const [selectedWifi, setSelectedWifi] = useState<WifiEntry>();
-  const [deviceProvisionedSuccess, setDeviceProvisionedSuccess] =
-    useState<boolean>(false);
-  const [provisioningData, setProvisioningData] = useState<{
-    meshId?: string;
-    gatewayMac?: string;
-    subGatewayMac?: string;
-    deviceRole?: number;
-    srcMac?: string;
-    dstMac?: string;
-    boardType?: number;
-    deviceType?: number;
-    userId?: string;
-  }>({});
+
+  const loadHomeWifiList = useCallback(() => {
+    WifiManager.loadWifiList()
+      .then(list => setWifiList(list.filter(item => item.SSID?.trim().length > 0)))
+      .catch(error => {
+        console.log({ error });
+      });
+  }, []);
+
+  const goBackToScan = useCallback(
+    (message: string) => {
+      setModalVisible(false);
+      navigation.navigate('ScanDevice', { retryMessage: message });
+    },
+    [navigation],
+  );
+
+  const goToHomeWithSuccess = useCallback(() => {
+    setModalVisible(false);
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      }),
+    );
+    Toast.show({
+      type: 'success',
+      text1: 'Device added successfully!',
+      text2: 'Your device has been added to the network.',
+      position: 'top',
+      visibilityTime: 4000,
+      autoHide: true,
+    });
+  }, [navigation]);
+
+  useEffect(() => {
+    if (!routeParams) {
+      navigation.goBack();
+    }
+  }, [routeParams, navigation]);
 
   useEffect(() => {
     request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION, {
@@ -81,57 +112,98 @@ const AddDevice = () => {
       buttonNegative: 'DENY',
       buttonPositive: 'ALLOW',
     })
-      .then(result => {
-        console.log({ result });
-        WifiManager.loadWifiList()
-          .then(wifiList => {
-            console.log({ wifiList });
-            setWifiList(wifiList);
-          })
-          .catch(error => {
-            console.log({ error });
-          });
-      })
+      .then(() => loadHomeWifiList())
       .catch(error => {
         console.log(error);
       });
-  }, []);
+  }, [loadHomeWifiList]);
 
-  const handleSetWifi = useCallback((wifiItem: WifiEntry) => {
-    setSelectedDevice(wifiItem);
-  }, []);
-
-  const handleConnectWifi = useCallback(() => {
-    if (!selectedDevice?.SSID) return;
-    setModalVisible(true);
-    setModalLoading(true);
+  const connectToDeviceAp = useCallback(() => {
+    if (!routeParams?.deviceSSID || selectedDevicePassword.length < 8) {
+      return;
+    }
+    setSetupStep('connecting');
     WifiManager.disconnect().then(() => {
       WifiManager.connectToProtectedSSID(
-        selectedDevice.SSID,
+        routeParams.deviceSSID,
         selectedDevicePassword,
         false,
         false,
       )
-        .then(
-          () => {
-            WifiManager.getCurrentWifiSSID().then(
-              ssid => {
-                setModalLoading(false);
-                if (ssid === selectedDevice?.SSID)
-                  setDeviceConnectedSuccess(true);
-              },
-              () => setModalLoading(false),
-            );
-          },
-          () => setModalLoading(false),
-        )
-        .catch(() => setModalLoading(false));
+        .then(() => {
+          WifiManager.getCurrentWifiSSID().then(
+            currentSsid => {
+              if (currentSsid === routeParams.deviceSSID) {
+                loadHomeWifiList();
+                setSetupStep('select_wifi');
+              } else {
+                goBackToScan(
+                  'Could not connect to the device. Please try again.',
+                );
+              }
+            },
+            () =>
+              goBackToScan(
+                'Could not connect to the device. Please try again.',
+              ),
+          );
+        })
+        .catch(() =>
+          goBackToScan('Could not connect to the device. Please try again.'),
+        );
     });
-  }, [selectedDevice, selectedDevicePassword]);
+  }, [
+    routeParams,
+    selectedDevicePassword,
+    loadHomeWifiList,
+    goBackToScan,
+  ]);
+
+  const addDeviceToBackend = useCallback(
+    async (data: {
+      meshId: string;
+      gatewayMac: string;
+      subGatewayMac: string;
+      deviceRole: number;
+      srcMac: string;
+      dstMac: string;
+      boardType: number;
+      deviceType: number;
+      userId: string;
+    }) => {
+      if (!data.meshId) {
+        return;
+      }
+      try {
+        const payload: AddDeviceRequest = {
+          siteId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+          meshId: data.meshId,
+          srcMac: data.srcMac || '00:00:00:00:00:00',
+          dstMac: data.dstMac || data.gatewayMac || '00:00:00:00:00:00',
+          gatewayMac: data.gatewayMac || '00:00:00:00:00:00',
+          subGatewayMac: data.subGatewayMac || '00:00:00:00:00:00',
+          boardType: data.boardType ?? 0,
+          deviceType: data.deviceType ?? 0,
+          deviceRole: data.deviceRole ?? 0,
+          userId: data.userId || '',
+        };
+
+        await dispatch(addDevice(payload)).unwrap();
+        goToHomeWithSuccess();
+      } catch (error) {
+        goBackToScan(
+          error instanceof Error
+            ? error.message
+            : 'Failed to add device. Please try again.',
+        );
+      }
+    },
+    [dispatch, goToHomeWithSuccess, goBackToScan],
+  );
 
   const handleInitiateProvisioning = useCallback(
     (wifiItem: WifiEntry) => {
-      setModalLoading(true);
+      setSetupStep('provisioning');
       const USER_ID = 'APP_USER_ID';
       const deviceId = getDeviceId();
       const meshId = 'aavitaRoom113#@';
@@ -147,8 +219,7 @@ const AddDevice = () => {
       const Wifissid = wifiItem?.SSID;
       const Wifipswd = selectedWifiPassword;
 
-      // Store provisioning data for API call
-      setProvisioningData({
+      const provisionMeta = {
         meshId,
         gatewayMac,
         subGatewayMac,
@@ -158,26 +229,40 @@ const AddDevice = () => {
         boardType: 0,
         deviceType: 0,
         userId: USER_ID,
-      });
-      let client = TcpSocket.createConnection(
+      };
+
+      let provisionFailed = false;
+      const failProvisioning = () => {
+        if (provisionFailed) {
+          return;
+        }
+        provisionFailed = true;
+        goBackToScan('Provisioning failed. Please try again.');
+      };
+
+      const client = TcpSocket.createConnection(
         { port: 3333, host: '192.168.10.1' },
-        async () => {
-          let step = 1,
-            stopped = false;
-          const send = (obj: any) => client.write(JSON.stringify(obj));
+        () => {
+          let step = 1;
+          let stopped = false;
+          const send = (obj: Record<string, unknown>) =>
+            client.write(JSON.stringify(obj));
+
           send({
             payloadType: ProvisioningStep.eUserDetails_A2D_Provision,
             usrId: USER_ID,
           });
-          client.on('data', function onData(data) {
-            if (stopped) return;
+
+          client.on('data', data => {
+            if (stopped) {
+              return;
+            }
             try {
-              console.log('Received: ' + typeof data, { data });
               const response = JSON.parse(data.toString());
               if (response.status === -1) {
                 stopped = true;
                 client.destroy();
-                setModalLoading(false);
+                failProvisioning();
                 return;
               }
               switch (step) {
@@ -229,117 +314,34 @@ const AddDevice = () => {
                 case 5:
                   stopped = true;
                   client.destroy();
-                  setDeviceProvisionedSuccess(true);
+                  addDeviceToBackend(provisionMeta);
                   break;
                 default:
                   break;
               }
-            } catch (err) {
+            } catch {
               stopped = true;
               client.destroy();
-              setModalLoading(false);
+              failProvisioning();
             }
           });
-          client.on('error', function () {
-            console.log('Socket Error');
+
+          client.on('error', () => {
             stopped = true;
             client.destroy();
-            setModalLoading(false);
+            failProvisioning();
           });
-          client.on('close', function () {
-            console.log('Socket close');
-            setModalLoading(false);
+
+          client.on('close', () => {
+            if (!stopped) {
+              failProvisioning();
+            }
           });
         },
       );
+
     },
-    [selectedWifiPassword],
-  );
-
-  useEffect(() => {
-    const addDeviceToBackend = async () => {
-      if (deviceProvisionedSuccess && provisioningData.meshId) {
-        try {
-          const payload: AddDeviceRequest = {
-            siteId: '3fa85f64-5717-4562-b3fc-2c963f66afa6', // TODO: Get from user context or settings
-            meshId: provisioningData.meshId,
-            srcMac: provisioningData.srcMac || '00:00:00:00:00:00',
-            dstMac: provisioningData.dstMac || provisioningData.gatewayMac || '00:00:00:00:00:00',
-            gatewayMac: provisioningData.gatewayMac || '00:00:00:00:00:00',
-            subGatewayMac: provisioningData.subGatewayMac || '00:00:00:00:00:00',
-            boardType: provisioningData.boardType ?? 0,
-            deviceType: provisioningData.deviceType ?? 0,
-            deviceRole: provisioningData.deviceRole ?? 0,
-            userId: provisioningData.userId || '',
-          };
-
-          await dispatch(addDevice(payload)).unwrap();
-
-          setModalLoading(false);
-          setModalVisible(false);
-          Toast.show({
-            type: 'success',
-            text1: 'Device added successfully!',
-            text2: 'Your device has been added to the network.',
-            position: 'top',
-            visibilityTime: 4000,
-            autoHide: true,
-            onHide: () => navigation.goBack(),
-          });
-        } catch (error) {
-          setModalLoading(false);
-          setModalVisible(false);
-          Toast.show({
-            type: 'error',
-            text1: 'Failed to add device',
-            text2: error instanceof Error ? error.message : 'Please try again.',
-            position: 'top',
-            visibilityTime: 4000,
-            autoHide: true,
-          });
-        }
-      }
-    };
-
-    addDeviceToBackend();
-  }, [deviceProvisionedSuccess, provisioningData, dispatch, navigation]);
-
-  const renderDeviceItem = useCallback(
-    ({ item }: { item: WifiEntry }) => (
-      <>
-        <TouchableOpacity
-          style={styles.deviceItem}
-          onPress={() => handleSetWifi(item)}
-        >
-          <Text style={styles.deviceText}>{item.SSID}</Text>
-          {item.BSSID === selectedDevice?.BSSID ? (
-            <ArrowDownIcon height={14} width={14} fill={colors.greyLight} />
-          ) : (
-            <ArrowNextIcon height={20} width={20} fill={colors.greyLight} />
-          )}
-        </TouchableOpacity>
-        {item.BSSID === selectedDevice?.BSSID && (
-          <View>
-            <CustomInput
-              InputIcon={PasswordLockIcon}
-              placeholder="Password"
-              maxLength={30}
-              value={selectedDevicePassword}
-              onChangeText={setSelectedDevicePassword}
-              isPassword
-            />
-            <Gap type="m" />
-            <ActionButton
-              title="Connect"
-              onPress={handleConnectWifi}
-              isDisable={selectedDevicePassword.length < 8}
-            />
-            <Gap type="m" />
-          </View>
-        )}
-      </>
-    ),
-    [handleSetWifi, selectedDevice, selectedDevicePassword, handleConnectWifi],
+    [selectedWifiPassword, goBackToScan, addDeviceToBackend],
   );
 
   const renderModalDeviceItem = useCallback(
@@ -351,16 +353,26 @@ const AddDevice = () => {
         >
           <Text style={styles.deviceText}>{item.SSID}</Text>
           {selectedWifi?.BSSID === item.BSSID ? (
-            <ArrowDownIcon height={14} width={14} fill={colors.greyLight} />
+            <Icon
+              name="arrow-down"
+              width={14}
+              height={14}
+              fill={colors.greyLight}
+            />
           ) : (
-            <ArrowNextIcon height={20} width={20} fill={colors.greyLight} />
+            <Icon
+              name="arrow-next"
+              width={20}
+              height={20}
+              fill={colors.greyLight}
+            />
           )}
         </TouchableOpacity>
-        {selectedWifi?.BSSID === item.BSSID && (
+        {selectedWifi?.BSSID === item.BSSID ? (
           <View>
             <CustomInput
-              InputIcon={PasswordLockIcon}
-              placeholder="Password"
+              icon="password-lock"
+              placeholder="WiFi password"
               maxLength={30}
               value={selectedWifiPassword}
               onChangeText={setSelectedWifiPassword}
@@ -374,62 +386,134 @@ const AddDevice = () => {
             />
             <Gap type="m" />
           </View>
-        )}
+        ) : null}
       </>
     ),
     [selectedWifi, selectedWifiPassword, handleInitiateProvisioning],
   );
 
+  const renderModalContent = () => {
+    switch (setupStep) {
+      case 'device_password':
+        return (
+          <View style={styles.smallModalCard}>
+            <Text style={styles.smallModalTitle}>Device Password</Text>
+            <Text style={styles.smallModalSubtitle}>
+              Enter the password for {routeParams?.deviceSSID}
+            </Text>
+            <Gap type="m" />
+            <CustomInput
+              icon="password-lock"
+              placeholder="Device password"
+              maxLength={30}
+              value={selectedDevicePassword}
+              onChangeText={setSelectedDevicePassword}
+              isPassword
+            />
+            <Gap type="l" />
+            <ActionButton
+              title="Connect"
+              onPress={connectToDeviceAp}
+              isDisable={selectedDevicePassword.length < 8}
+            />
+          </View>
+        );
+
+      case 'connecting':
+        return (
+          <View style={styles.loaderCard}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={styles.loadingText}>Connecting to device...</Text>
+            <Text style={styles.loadingSubtext}>
+              Please wait while we connect to your device.
+            </Text>
+          </View>
+        );
+
+      case 'provisioning':
+        return (
+          <View style={styles.loaderCard}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={styles.loadingText}>Setting up your device</Text>
+            <Text style={styles.loadingSubtext}>
+              This may take a moment. Keep your phone close to the device.
+            </Text>
+          </View>
+        );
+
+      case 'select_wifi':
+        return (
+          <View style={styles.sheetContent}>
+            <Text style={styles.modalHeaderText}>
+              Select WiFi network for your device
+            </Text>
+            <FlatList
+              data={wifiList}
+              showsVerticalScrollIndicator={false}
+              keyExtractor={item => item.BSSID.toString()}
+              contentContainerStyle={styles.flatListContent}
+              renderItem={renderModalDeviceItem}
+            />
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const isSmallModal =
+    setupStep === 'device_password' ||
+    setupStep === 'connecting' ||
+    setupStep === 'provisioning';
+
+  if (!routeParams) {
+    return null;
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <BackButtonHeader />
-        <Text style={styles.headerText}>Add New Device</Text>
+        <Text style={styles.headerText}>Add Device</Text>
         <Gap type="l" />
-        <Text style={styles.subText}>Select from the available devices.</Text>
-        <FlatList
-          data={wifiList}
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={item => item.BSSID.toString()}
-          contentContainerStyle={styles.flatListContent}
-          renderItem={renderDeviceItem}
-        />
+        <Text style={styles.subText}>
+          Setting up {routeParams.deviceSSID}
+        </Text>
       </View>
+
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(!modalVisible)}
+        onRequestClose={() => {
+          if (setupStep === 'device_password') {
+            navigation.goBack();
+          }
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            onPress={() => setModalVisible(!modalVisible)}
-            style={styles.closeButton}
-          >
-            <CloseIcon width={20} height={20} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.modalContent}>
-          {modalLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.greyLight} />
-              <Text style={styles.loadingText}>Loading...</Text>
+        <Pressable
+          style={[
+            styles.modalBackdrop,
+            isSmallModal && styles.modalBackdropCentered,
+          ]}
+          onPress={() => {
+            if (setupStep === 'device_password') {
+              navigation.goBack();
+            }
+          }}
+        >
+          {isSmallModal ? (
+            <Pressable style={styles.smallModalWrap} onPress={() => {}}>
+              {renderModalContent()}
+            </Pressable>
+          ) : (
+            <View style={styles.bottomSheetWrap}>
+              <View style={styles.sheetHandle} />
+              {renderModalContent()}
             </View>
-          ) : deviceConnectedSuccess ? (
-            <>
-              <Text style={styles.modalHeaderText}>
-                Select Wifi Network for your device.
-              </Text>
-              <FlatList
-                data={wifiList}
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={item => item.BSSID.toString()}
-                contentContainerStyle={styles.flatListContent}
-                renderItem={renderModalDeviceItem}
-              />
-            </>
-          ) : null}
-        </View>
+          )}
+        </Pressable>
       </Modal>
       <ToastManager config={{}} />
     </SafeAreaView>
@@ -457,52 +541,86 @@ const styles = StyleSheet.create({
   },
   flatListContent: {
     paddingBottom: 20,
-    marginTop: 20,
-  },
-  deviceItem: {
-    backgroundColor: colors.bgSecondary,
-    padding: 12,
-    borderRadius: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
   },
   deviceText: {
     ...textFont.regularS,
     color: colors.textPrimary,
   },
-  modalOverlay: {
+  modalBackdrop: {
     flex: 1,
-    backgroundColor: colors.bgBackground,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
-    padding: 16,
-    alignItems: 'flex-end',
   },
-  closeButton: {
-    backgroundColor: colors.greyLight,
-    padding: 16,
-    borderRadius: 50,
-  },
-  modalContent: {
-    backgroundColor: colors.bgSecondary,
-    height: 500,
-    padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
+  modalBackdropCentered: {
     justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  smallModalWrap: {
+    width: '100%',
+    maxWidth: 360,
+    alignSelf: 'center',
+  },
+  smallModalCard: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+  },
+  smallModalTitle: {
+    ...textFont.boldL,
+    color: colors.textPrimary,
+  },
+  smallModalSubtitle: {
+    ...textFont.regularS,
+    color: colors.textSecondary,
+    marginTop: 6,
+  },
+  loaderCard: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 16,
+    padding: 28,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
   },
   loadingText: {
     ...textFont.boldL,
     color: colors.textPrimary,
-    marginTop: 12,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    ...textFont.regularS,
+    color: colors.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  bottomSheetWrap: {
+    backgroundColor: colors.bgSecondary,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '75%',
+    paddingBottom: 24,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.lineGrey,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  sheetContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    maxHeight: 520,
   },
   modalHeaderText: {
     ...textFont.boldL,
     color: colors.textPrimary,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   modalDeviceItem: {
     backgroundColor: colors.bgPrimary,

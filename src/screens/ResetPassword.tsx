@@ -5,7 +5,6 @@ import { Text, View } from 'react-native';
 import { textFont } from '../utils/textFont';
 import Gap from '../components/Gap';
 import CustomInput from '../components/CustomInput';
-import { PasswordLockIcon, MailIcon } from '../assets/icons';
 import ActionButton from '../components/ActionButton';
 import { useNavigation } from '@react-navigation/native';
 import BackButtonHeader from '../components/BackButtonHeader';
@@ -127,7 +126,7 @@ const ResetPassword = () => {
         </Text>
         <Gap type="l" />
         <CustomInput
-          InputIcon={MailIcon}
+          icon="mail"
           placeholder="Enter Email"
           maxLength={50}
           value={formValues.email}
@@ -138,7 +137,7 @@ const ResetPassword = () => {
         />
         <Gap type="m" />
         <CustomInput
-          InputIcon={PasswordLockIcon}
+          icon="password-lock"
           placeholder="New Password"
           maxLength={30}
           isPassword
@@ -148,7 +147,7 @@ const ResetPassword = () => {
         />
         <Gap type="m" />
         <CustomInput
-          InputIcon={PasswordLockIcon}
+          icon="password-lock"
           placeholder="Re-enter New Password"
           maxLength={30}
           isPassword

@@ -1,53 +1,38 @@
 import React from 'react';
-import { View, StyleSheet, Text, Image } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { colors } from '../themes/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { textFont } from '../utils/textFont';
 import { useNavigation } from '@react-navigation/native';
-import Gap from '../components/Gap';
-import ActionButton from '../components/ActionButton';
+import IntroIllustration from '../components/IntroIllustration';
+import GradientButton from '../components/GradientButton';
 
 const Intro: React.FC = () => {
-  const navigation = useNavigation()
+  const navigation = useNavigation();
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={{ justifyContent: 'center', alignItems: 'center', flex: 1 }}>
-        <Image
-          source={require('../assets/images/AavitaLogo.png')}
-          style={{ height: 200, width: 200 }}
-          resizeMode="contain"
-        />
-        <Text
-          style={{
-            ...textFont.boldXXXL,
-            color: colors.textSecondary,
-            marginTop: 24,
-          }}
-        >
-          Aavita Homes
-        </Text>
-        <Text
-          style={{
-            ...textFont.boldL,
-            color: colors.textSecondary,
-            lineHeight: 28,
-          }}
-        >
-          Smart Living Starts Here
+      <View style={styles.content}>
+        <View style={styles.illustrationSection}>
+          <IntroIllustration />
+        </View>
+
+        <View style={styles.dots}>
+          <View style={styles.dotActive} />
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+        </View>
+
+        <Text style={styles.title}>Control Your Entire Home</Text>
+        <Text style={styles.description}>
+          Manage all smart devices from one beautiful app. Lights, AC, security
+          — all in your pocket.
         </Text>
       </View>
-      <View style={{ width: '100%', marginVertical: 20 }}>
-        <ActionButton
-          title={'Sign Up'}
-          bgColor={colors.bgSecondary}
-          textColor={colors.greyLight}
-          onPress={() => navigation.navigate('SignUp' as never)}
-        />
-        <Gap orientation="vertical" type="m" />
-        <ActionButton
-          title={'Log In'}
-          bgColor={colors.secondary}
-          textColor={colors.textPrimary}
+
+      <View style={styles.footer}>
+        <GradientButton
+          title="Next →"
           onPress={() => navigation.navigate('Login' as never)}
         />
       </View>
@@ -55,12 +40,53 @@ const Intro: React.FC = () => {
   );
 };
 
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgPrimary,
-    padding: 20,
+    paddingHorizontal: 24,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  illustrationSection: {
+    marginBottom: 32,
+  },
+  dots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 28,
+  },
+  dotActive: {
+    width: 24,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.dotActive,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.dotInactive,
+  },
+  title: {
+    ...textFont.boldXL,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  description: {
+    ...textFont.regularM,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  footer: {
+    paddingBottom: 24,
   },
 });
 

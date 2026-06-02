@@ -6,18 +6,17 @@ import {
   userChangePasswordRequest,
   UserInfo,
   userUpdateProfileRequest,
+  forgotPasswordOtpRequest,
+  verifyForgotPasswordOtpRequest,
+  resetPasswordWithOtpRequest,
 } from '../types/user';
-import { setStorage, STORAGE_KEYS } from '../utils/storage';
+import { persistAuthToken } from '../utils/authSession';
 
 export const userLoginApi = async (payload: userLoginRequest) => {
   const response = await axios.post('/api/auth/login', payload);
   const token = response?.data?.token;
   if (token) {
-    const bearerToken = `Bearer ${token}`;
-    console.log(STORAGE_KEYS.authToken, bearerToken)
-    // setStorage(STORAGE_KEYS.authToken, bearerToken);
-    console.log({bearerToken})
-    axios.defaults.headers.common['Authorization'] = bearerToken;
+    await persistAuthToken(token);
   }
   return response.data;
 };
@@ -28,6 +27,24 @@ export const userRegisterApi = async (payload: userRegisterRequest) => {
 
 export const userResetPasswordApi = async (
   payload: userResetPasswordRequest,
+) => {
+  return axios.post('/api/Auth/reset-password', payload);
+};
+
+export const sendForgotPasswordOtpApi = async (
+  payload: forgotPasswordOtpRequest,
+) => {
+  return axios.post('/api/Auth/forgot-password', payload);
+};
+
+export const verifyForgotPasswordOtpApi = async (
+  payload: verifyForgotPasswordOtpRequest,
+) => {
+  return axios.post('/api/Auth/verify-otp', payload);
+};
+
+export const resetPasswordWithOtpApi = async (
+  payload: resetPasswordWithOtpRequest,
 ) => {
   return axios.post('/api/Auth/reset-password', payload);
 };

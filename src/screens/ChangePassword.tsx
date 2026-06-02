@@ -8,7 +8,6 @@ import BackButtonHeader from '../components/BackButtonHeader';
 import { textFont } from '../utils/textFont';
 import Gap from '../components/Gap';
 import CustomInput from '../components/CustomInput';
-import { PasswordLockIcon } from '../assets/icons';
 import ActionButton from '../components/ActionButton';
 import { validateField, isFieldValid } from '../utils/validators';
 import { userChangePasswordApi } from '../apis/userAPI';
@@ -129,7 +128,7 @@ const ChangePassword = () => {
         </Text>
         <Gap type="l" />
         <CustomInput
-          InputIcon={PasswordLockIcon}
+          icon="password-lock"
           placeholder="Current Password"
           maxLength={30}
           isPassword
@@ -139,7 +138,7 @@ const ChangePassword = () => {
         />
         <Gap type="m" />
         <CustomInput
-          InputIcon={PasswordLockIcon}
+          icon="password-lock"
           placeholder="New Password"
           maxLength={30}
           isPassword
@@ -149,7 +148,7 @@ const ChangePassword = () => {
         />
         <Gap type="m" />
         <CustomInput
-          InputIcon={PasswordLockIcon}
+          icon="password-lock"
           placeholder="Confirm New Password"
           maxLength={30}
           isPassword

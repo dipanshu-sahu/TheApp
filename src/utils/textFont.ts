@@ -1,7 +1,6 @@
 const fontFamily = {
-  regular: 'Noah Text Regular',
-  medium: 'Noah Text Medium',
-  bold: 'Noah Text Bold',
+  regular: 'Nunito-Regular',
+  bold: 'Nunito-Bold',
 };
 
 export const textFont = {

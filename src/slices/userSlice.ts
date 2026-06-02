@@ -6,14 +6,23 @@ import {
 } from '../apis/userAPI';
 import {
   userLoginRequest,
-  userLoginResponse,
   UserInfo,
   userUpdateProfileRequest,
 } from '../types/user';
 import { addAsyncCases, ApiState, createApiState } from '../utils/reduxHelper';
+import {
+  getUserSession,
+  saveUserSession,
+} from '../utils/secureStorage';
+import {
+  loadStoredAuthToken,
+  signOut,
+} from '../utils/authSession';
 
 interface UserState {
   user: UserInfo | null;
+  isAuthenticated: boolean;
+  isRestoringSession: boolean;
   loginApi: ApiState;
   fetchUserApi: ApiState;
   updateProfileApi: ApiState;
@@ -21,46 +30,82 @@ interface UserState {
 
 const initialState: UserState = {
   user: null,
+  isAuthenticated: false,
+  isRestoringSession: true,
   loginApi: createApiState(),
   fetchUserApi: createApiState(),
   updateProfileApi: createApiState(),
 };
 
-export const userLogin = createAsyncThunk<userLoginResponse, userLoginRequest>(
+const resolveCurrentUser = (users: UserInfo[]): UserInfo | null =>
+  users[0] ?? null;
+
+export const userLogin = createAsyncThunk<UserInfo, userLoginRequest>(
   'user/login',
-  async (info: userLoginRequest) => {
-    try {
-      const response = await userLoginApi(info);
-      console.log({response})
-      return response;
-    } catch (error) {
-      throw error;
+  async credentials => {
+    await userLoginApi(credentials);
+    const users = await getUsersApi();
+    const user = resolveCurrentUser(users);
+    if (!user) {
+      throw new Error('Unable to load user profile after login.');
     }
+    await saveUserSession(user);
+    return user;
   },
 );
 
-export const fetchUsers = createAsyncThunk<UserInfo[]>(
+export const fetchUsers = createAsyncThunk<UserInfo | null>(
   'user/fetchUsers',
   async () => {
-    try {
-      const response = await getUsersApi();
-      return response;
-    } catch (error) {
-      throw error;
+    const users = await getUsersApi();
+    const user = resolveCurrentUser(users);
+    if (user) {
+      await saveUserSession(user);
     }
+    return user;
   },
 );
+
+export const restoreSession = createAsyncThunk<UserInfo | null>(
+  'user/restoreSession',
+  async () => {
+    const token = await loadStoredAuthToken();
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const users = await getUsersApi();
+      const user = resolveCurrentUser(users);
+      if (user) {
+        await saveUserSession(user);
+        return user;
+      }
+    } catch {
+      const cachedUser = await getUserSession();
+      if (cachedUser) {
+        return cachedUser;
+      }
+      await signOut();
+      return null;
+    }
+
+    return getUserSession();
+  },
+);
+
+export const logout = createAsyncThunk<void, void>('user/logout', async () => {
+  await signOut();
+});
 
 export const updateUserProfile = createAsyncThunk<
   UserInfo,
   { userId: string; payload: userUpdateProfileRequest }
 >('user/updateProfile', async ({ userId, payload }) => {
-  try {
-    const response = await updateUserProfileApi(userId, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await updateUserProfileApi(userId, payload);
+  const updatedUser = response.data as UserInfo;
+  await saveUserSession(updatedUser);
+  return updatedUser;
 });
 
 export const userSlice = createSlice({
@@ -68,55 +113,41 @@ export const userSlice = createSlice({
   initialState,
   reducers: {},
   extraReducers: builder => {
-    addAsyncCases(
-      builder,
-      userLogin,
-      'loginApi',
-      'user'
-    );
-    addAsyncCases(
-      builder,
-      fetchUsers,
-      'fetchUserApi',
-      'user'
-    );
-    addAsyncCases(
-      builder,
-      updateUserProfile,
-      'updateProfileApi',
-      'user'
-    )
-  }
-  // extraReducers: builder => {
-  //   builder
-  //     .addCase(fetchUsers.pending, state => {
-  //       state.isLoading = true;
-  //       state.error = null;
-  //     })
-  //     .addCase(fetchUsers.fulfilled, (state, action) => {
-  //       state.isLoading = false;
-  //       state.users = action.payload || [];
-  //     })
-  //     .addCase(fetchUsers.rejected, (state, action) => {
-  //       state.isLoading = false;
-  //       state.error = action.error.message || 'Failed to fetch users';
-  //     })
-  //     .addCase(updateUserProfile.fulfilled, (state, action) => {
-  //       const updatedUser = action.payload;
-  //       if (!updatedUser) {
-  //         return;
-  //       }
-  //       const index = state.users.findIndex(user => user.id === updatedUser.id);
-  //       if (index !== -1) {
-  //         state.users[index] = {
-  //           ...state.users[index],
-  //           ...updatedUser,
-  //         };
-  //       } else {
-  //         state.users = [updatedUser];
-  //       }
-  //     });
-  // },
+    addAsyncCases(builder, userLogin, 'loginApi', 'user', state => {
+      state.isAuthenticated = true;
+    });
+
+    addAsyncCases(builder, fetchUsers, 'fetchUserApi', undefined, (state, action) => {
+      if (action.payload) {
+        state.user = action.payload;
+        state.isAuthenticated = true;
+      }
+    });
+
+    builder
+      .addCase(restoreSession.pending, state => {
+        state.isRestoringSession = true;
+      })
+      .addCase(restoreSession.fulfilled, (state, action) => {
+        state.isRestoringSession = false;
+        state.user = action.payload;
+        state.isAuthenticated = !!action.payload;
+      })
+      .addCase(restoreSession.rejected, state => {
+        state.isRestoringSession = false;
+        state.user = null;
+        state.isAuthenticated = false;
+      })
+      .addCase(logout.fulfilled, state => {
+        state.user = null;
+        state.isAuthenticated = false;
+        state.loginApi = createApiState();
+        state.fetchUserApi = createApiState();
+        state.updateProfileApi = createApiState();
+      });
+
+    addAsyncCases(builder, updateUserProfile, 'updateProfileApi', 'user');
+  },
 });
 
 export default userSlice.reducer;

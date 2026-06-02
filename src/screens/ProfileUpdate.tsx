@@ -6,7 +6,6 @@ import BackButtonHeader from '../components/BackButtonHeader';
 import { textFont } from '../utils/textFont';
 import Gap from '../components/Gap';
 import CustomInput from '../components/CustomInput';
-import { ProfileIcon } from '../assets/icons';
 import ActionButton from '../components/ActionButton';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
@@ -18,10 +17,10 @@ import { useNavigation } from '@react-navigation/native';
 const ProfileUpdate = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation();
-  const { users, isLoading, error } = useSelector(
+  const { user, fetchUserApi, updateProfileApi } = useSelector(
     (state: RootState) => state.user,
   );
-  const currentUser = useMemo(() => users?.[0], [users]);
+  const currentUser = useMemo(() => user, [user]);
 
   const [formValues, setFormValues] = useState({
     firstName: currentUser?.firstName ?? '',
@@ -39,10 +38,10 @@ const ProfileUpdate = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!users?.length) {
+    if (!user) {
       dispatch(fetchUsers());
     }
-  }, [dispatch, users?.length]);
+  }, [dispatch, user]);
 
   useEffect(() => {
     setFormValues({
@@ -142,7 +141,7 @@ const ProfileUpdate = () => {
         </Text>
         <Gap type="l" />
         <CustomInput
-          InputIcon={ProfileIcon}
+          icon="profile"
           placeholder="First Name"
           maxLength={30}
           value={formValues.firstName}
@@ -152,7 +151,7 @@ const ProfileUpdate = () => {
         />
         <Gap type="m" />
         <CustomInput
-          InputIcon={ProfileIcon}
+          icon="profile"
           placeholder="Last Name"
           maxLength={30}
           value={formValues.lastName}
@@ -162,7 +161,7 @@ const ProfileUpdate = () => {
         />
         <Gap type="m" />
         <CustomInput
-          InputIcon={ProfileIcon}
+          icon="profile"
           placeholder="Phone Number"
           maxLength={15}
           value={formValues.phoneNumber}
@@ -172,7 +171,7 @@ const ProfileUpdate = () => {
         />
         <Gap type="m" />
         <CustomInput
-          InputIcon={ProfileIcon}
+          icon="profile"
           placeholder="User Type"
           maxLength={30}
           value={formValues.type}
@@ -181,10 +180,10 @@ const ProfileUpdate = () => {
         />
       </View>
       <View style={{ padding: 16 }}>
-        {formError || error ? (
+        {formError || updateProfileApi.error ? (
           <>
             <Text style={{ ...textFont.regularS, color: colors.error }}>
-              {formError || error}
+              {formError || updateProfileApi.error}
             </Text>
             <Gap type="s" />
           </>
