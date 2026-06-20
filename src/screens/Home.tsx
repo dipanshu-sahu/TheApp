@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -15,29 +15,35 @@ import { colors } from '../themes/colors';
 import { textFont } from '../utils/textFont';
 import { fetchUsers } from '../slices/userSlice';
 import { AppDispatch, RootState } from '../store/store';
-import { fetchDevices } from '../slices/deviceSlice';
+import { fetchDevicesBySite } from '../slices/deviceSlice';
+import { fetchWeatherWithLocation } from '../slices/weatherSlice';
+import { fetchSitesByUser, selectSite } from '../slices/siteSlice';
 import HomeHeader from '../components/home/HomeHeader';
 import WeatherWidget from '../components/home/WeatherWidget';
-import QuickActionCard from '../components/home/QuickActionCard';
-import CategorySection from '../components/home/CategorySection';
-import HomeDeviceCard from '../components/home/HomeDeviceCard';
-import SmartSwitchDeviceCard from '../components/home/SmartSwitchDeviceCard';
-import {
-  getDeviceIcon,
-  getDeviceStatusLabel,
-  getSwitchGangCount,
-  groupDevicesByHomeSection,
-  HOME_DEVICE_SECTIONS,
-  HomeDeviceSection,
-  isDeviceOnline,
-} from '../utils/deviceDisplay';
-import { DeviceInfo } from '../types/device';
-import { mergeWithMockHomeDevices } from '../mocks/homeDevices';
+import SiteDropdown from '../components/site/SiteDropdown';
+import CreateSiteModal from '../components/site/CreateSiteModal';
+// import QuickActionCard from '../components/home/QuickActionCard';
+// import CategorySection from '../components/home/CategorySection';
+// import HomeDeviceCard from '../components/home/HomeDeviceCard';
+import ConnectedSmartSwitchCard from '../components/home/ConnectedSmartSwitchCard';
+import { isDeviceOnline } from '../utils/deviceDisplay';
+import { filterSmartSwitchDevices } from '../utils/deviceMapper';
+// import { mergeWithMockHomeDevices } from '../mocks/homeDevices';
+// import {
+//   getDeviceIcon,
+//   getDeviceStatusLabel,
+//   getSwitchGangCount,
+//   groupDevicesByHomeSection,
+//   HOME_DEVICE_SECTIONS,
+//   HomeDeviceSection,
+// } from '../utils/deviceDisplay';
 
 type HomeStackParamList = {
   Device: { deviceId: string };
   ScanDevice: undefined;
 };
+
+const SMART_SWITCH_SECTION_TITLE = 'Smart Switch';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -48,14 +54,6 @@ const getGreeting = () => {
     return 'Good Afternoon ☀️';
   }
   return 'Good Evening 🌙';
-};
-
-const chunkPairs = (list: DeviceInfo[]): DeviceInfo[][] => {
-  const pairs: DeviceInfo[][] = [];
-  for (let i = 0; i < list.length; i += 2) {
-    pairs.push(list.slice(i, i + 2));
-  }
-  return pairs;
 };
 
 const Home: React.FC = () => {
@@ -69,178 +67,53 @@ const Home: React.FC = () => {
     error: devicesError,
   } = useSelector((state: RootState) => state.devices);
 
-  const devices = useMemo(
-    () => mergeWithMockHomeDevices(apiDevices ?? []),
+  const { selectedSite } = useSelector((state: RootState) => state.site);
+
+  const [showCreateSite, setShowCreateSite] = useState(false);
+
+  const smartSwitches = useMemo(
+    () => filterSmartSwitchDevices(apiDevices ?? []),
     [apiDevices],
   );
 
-  const [toggleState, setToggleState] = useState<Record<string, boolean>>({});
-  const [gangState, setGangState] = useState<Record<string, boolean[]>>({});
-
   const currentUser = Array.isArray(user) ? user[0] : user;
-  const firstName = currentUser?.firstName || 'Rahul';
+  const firstName = currentUser?.firstName || '';
   const homeTitle = `${firstName}'s Home`;
   const avatarLabel = firstName.charAt(0).toUpperCase();
 
   useEffect(() => {
     if (!currentUser) {
       dispatch(fetchUsers());
+    } else if (currentUser.id) {
+      dispatch(fetchSitesByUser(currentUser.id));
     }
   }, [dispatch, currentUser]);
 
   useEffect(() => {
-    dispatch(fetchDevices());
-  }, [dispatch]);
+    if (selectedSite?.siteId) {
+      dispatch(fetchDevicesBySite(selectedSite.siteId));
+    }
+  }, [dispatch, selectedSite?.siteId]);
 
   useEffect(() => {
-    if (devices?.length) {
-      setToggleState(prev => {
-        const next = { ...prev };
-        devices.forEach((device, index) => {
-          if (next[device.id] === undefined) {
-            next[device.id] = isDeviceOnline(device) || index % 2 === 0;
-          }
-        });
-        return next;
-      });
-
-      setGangState(prev => {
-        const next = { ...prev };
-        devices.forEach((device, index) => {
-          if (next[device.id] === undefined) {
-            const gangCount = getSwitchGangCount(device.name);
-            const deviceOn = isDeviceOnline(device) || index % 2 === 0;
-            next[device.id] = Array.from({ length: gangCount }, () => deviceOn);
-          }
-        });
-        return next;
-      });
-    }
-  }, [devices]);
-
-  const groupedDevices = useMemo(
-    () => groupDevicesByHomeSection(devices ?? []),
-    [devices],
-  );
+    dispatch(fetchWeatherWithLocation());
+  }, [dispatch]);
 
   const onlineCount = useMemo(
-    () =>
-      devices?.filter(
-        device => toggleState[device.id] ?? isDeviceOnline(device),
-      ).length ?? 0,
-    [devices, toggleState],
+    () => smartSwitches.filter(device => isDeviceOnline(device)).length,
+    [smartSwitches],
   );
-
-  const handleToggle = useCallback((deviceId: string, value: boolean) => {
-    setToggleState(prev => ({ ...prev, [deviceId]: value }));
-  }, []);
-
-  const handleMainSwitchToggle = useCallback(
-    (device: DeviceInfo, value: boolean) => {
-      handleToggle(device.id, value);
-      const gangCount = getSwitchGangCount(device.name);
-      setGangState(prev => ({
-        ...prev,
-        [device.id]: Array.from({ length: gangCount }, () => value),
-      }));
-    },
-    [handleToggle],
-  );
-
-  const handleGangToggle = useCallback(
-    (device: DeviceInfo, index: number, value: boolean) => {
-      setGangState(prev => {
-        const current = prev[device.id] ?? [];
-        const nextGangs = [...current];
-        nextGangs[index] = value;
-        const anyOn = nextGangs.some(Boolean);
-        setToggleState(togglePrev => ({ ...togglePrev, [device.id]: anyOn }));
-        return { ...prev, [device.id]: nextGangs };
-      });
-    },
-    [],
-  );
-
-  const renderStandardDeviceGrid = (
-    sectionDevices: DeviceInfo[],
-    sectionOffset: number,
-  ) =>
-    chunkPairs(sectionDevices).map((pair, pairIndex) => (
-      <View
-        key={pair.map(d => d.id).join('-')}
-        style={styles.deviceRow}
-      >
-        {pair.map((device, colIndex) => {
-          const globalIndex = sectionOffset + pairIndex * 2 + colIndex;
-          const isOn = toggleState[device.id] ?? isDeviceOnline(device);
-
-          return (
-            <View key={device.id} style={styles.deviceCol}>
-              <HomeDeviceCard
-                name={device.name}
-                statusLabel={getDeviceStatusLabel(device, globalIndex)}
-                icon={getDeviceIcon(device?.name || '')}
-                isOn={isOn}
-                onToggle={value => handleToggle(device.id, value)}
-                onPress={() =>
-                  navigation.navigate('Device', { deviceId: device.id })
-                }
-              />
-            </View>
-          );
-        })}
-        {pair.length === 1 ? <View style={styles.deviceCol} /> : null}
-      </View>
-    ));
-
-  const renderSection = (section: HomeDeviceSection) => {
-    const sectionDevices = groupedDevices[section];
-    if (!sectionDevices.length) {
-      return null;
-    }
-
-    const sectionMeta = HOME_DEVICE_SECTIONS.find(s => s.id === section);
-
-    return (
-      <View key={section} style={styles.deviceSection}>
-        <Text style={styles.deviceSectionTitle}>{sectionMeta?.title}</Text>
-
-        {section === 'switch'
-          ? sectionDevices.map(device => {
-              const isOn = toggleState[device.id] ?? isDeviceOnline(device);
-              const gangs =
-                gangState[device.id] ??
-                Array.from(
-                  { length: getSwitchGangCount(device.name) },
-                  () => isOn,
-                );
-
-              return (
-                <SmartSwitchDeviceCard
-                  key={device.id}
-                  name={device.name}
-                  isOn={isOn}
-                  gangStates={gangs}
-                  onMainToggle={value => handleMainSwitchToggle(device, value)}
-                  onGangToggle={(index, value) =>
-                    handleGangToggle(device, index, value)
-                  }
-                  onPress={() =>
-                    navigation.navigate('Device', { deviceId: device.id })
-                  }
-                />
-              );
-            })
-          : renderStandardDeviceGrid(
-              sectionDevices,
-              section === 'light' ? 0 : groupedDevices.light.length,
-            )}
-      </View>
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <CreateSiteModal
+        visible={showCreateSite}
+        onClose={() => setShowCreateSite(false)}
+        onCreated={site => {
+          dispatch(selectSite(site));
+          setShowCreateSite(false);
+        }}
+      />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -254,14 +127,16 @@ const Home: React.FC = () => {
           }
         />
 
+        <SiteDropdown onAddSite={() => setShowCreateSite(true)} />
+
         <WeatherWidget />
 
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        {/* <Text style={styles.sectionTitle}>Quick Actions</Text>
         <QuickActionCard
           onPress={() => navigation.navigate('ScanDevice')}
         />
 
-        <CategorySection />
+        <CategorySection /> */}
 
         <View style={styles.devicesHeader}>
           <Text style={styles.sectionTitle}>My Devices</Text>
@@ -278,13 +153,37 @@ const Home: React.FC = () => {
           <Text style={styles.errorText}>{devicesError}</Text>
         ) : null}
 
-        {!devicesLoading && !devices.length ? (
+        {!devicesLoading && !selectedSite ? (
           <Text style={styles.emptyText}>
-            No devices yet. Tap Add New Device to get started.
+            Select a site above to see your devices.
           </Text>
         ) : null}
 
-        {HOME_DEVICE_SECTIONS.map(({ id }) => renderSection(id))}
+        {!devicesLoading && selectedSite && !smartSwitches.length ? (
+          <Text style={styles.emptyText}>
+            No devices found in {selectedSite.location}. Add a device to get started.
+          </Text>
+        ) : null}
+
+        {smartSwitches.length > 0 ? (
+          <View style={styles.deviceSection}>
+            <Text style={styles.deviceSectionTitle}>
+              {SMART_SWITCH_SECTION_TITLE}
+            </Text>
+
+            {smartSwitches.map(device => (
+              <ConnectedSmartSwitchCard
+                key={device.id}
+                device={device}
+                onPress={() =>
+                  navigation.navigate('Device', { deviceId: device.id })
+                }
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {/* {HOME_DEVICE_SECTIONS.map(({ id }) => renderSection(id))} */}
       </ScrollView>
     </SafeAreaView>
   );
@@ -322,14 +221,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 12,
     letterSpacing: 0.3,
-  },
-  deviceRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  deviceCol: {
-    flex: 1,
   },
   loader: {
     marginVertical: 16,

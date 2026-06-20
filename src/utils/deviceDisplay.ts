@@ -1,5 +1,5 @@
 import { IconName } from '../components/Icon';
-import { DeviceInfo } from '../types/device';
+import { DEVICE_TYPE_SMART_SWITCH, DeviceInfo } from '../types/device';
 import { colors } from '../themes/colors';
 
 export type DeviceCategory = 'lighting' | 'climate' | 'security' | 'plugs';
@@ -57,6 +57,12 @@ export const getDeviceIcon = (name: string): IconName => {
 };
 
 export const getDeviceHomeSection = (device: DeviceInfo): HomeDeviceSection => {
+  if (
+    device.deviceType === DEVICE_TYPE_SMART_SWITCH ||
+    (device.digitalPins?.length ?? 0) > 0
+  ) {
+    return 'switch';
+  }
   const lower = device?.name?.toLowerCase?.() || '';
   if (lower.includes('switch') || lower.includes('gang')) {
     return 'switch';
@@ -117,4 +123,4 @@ export const getDeviceStatusLabel = (device: DeviceInfo, index: number): string 
 };
 
 export const isDeviceOnline = (device: DeviceInfo) =>
-  device.status?.toLowerCase() === 'online';
+  device.status === 'online';

@@ -15,6 +15,7 @@ type SmartSwitchDeviceCardProps = {
   name: string;
   isOn: boolean;
   gangStates: boolean[];
+  disabled?: boolean;
   onMainToggle: (value: boolean) => void;
   onGangToggle: (index: number, value: boolean) => void;
   onPress: () => void;
@@ -24,11 +25,16 @@ const SmartSwitchDeviceCard: React.FC<SmartSwitchDeviceCardProps> = ({
   name,
   isOn,
   gangStates,
+  disabled = false,
   onMainToggle,
   onGangToggle,
   onPress,
 }) => (
-  <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.92}>
+  <TouchableOpacity
+    style={[styles.card, disabled && styles.cardDisabled]}
+    onPress={onPress}
+    activeOpacity={0.92}
+  >
     <View style={styles.header}>
       <View style={styles.deviceIconBox}>
         <Icon name="power-button" width={18} height={18} fill={colors.textPrimary} />
@@ -38,9 +44,10 @@ const SmartSwitchDeviceCard: React.FC<SmartSwitchDeviceCardProps> = ({
       </Text>
       <TouchableOpacity
         style={[styles.mainPowerBtn, isOn && styles.mainPowerBtnOn]}
-        onPress={() => onMainToggle(!isOn)}
+        onPress={() => !disabled && onMainToggle(!isOn)}
         activeOpacity={0.85}
         hitSlop={8}
+        disabled={disabled}
       >
         <Icon
           name="power-button"
@@ -58,8 +65,9 @@ const SmartSwitchDeviceCard: React.FC<SmartSwitchDeviceCardProps> = ({
           <TouchableOpacity
             key={`gang-${index}`}
             style={styles.gangCol}
-            onPress={() => onGangToggle(index, !gangOn)}
+            onPress={() => !disabled && onGangToggle(index, !gangOn)}
             activeOpacity={0.85}
+            disabled={disabled}
           >
             <Icon
               name="power-button"
@@ -95,6 +103,9 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 4 },
     }),
+  },
+  cardDisabled: {
+    opacity: 0.7,
   },
   header: {
     flexDirection: 'row',

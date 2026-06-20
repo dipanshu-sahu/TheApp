@@ -115,7 +115,7 @@ const Profile = () => {
 
   const handleLogout = async () => {
     await dispatch(logout()).unwrap();
-    navigation.getParent()?.getParent()?.getParent()?.dispatch(
+    navigation.getParent()?.getParent()?.dispatch(
       CommonActions.reset({
         index: 0,
         routes: [{ name: 'Login' }],
@@ -124,7 +124,7 @@ const Profile = () => {
   };
 
   const resetToLogin = () => {
-    navigation.getParent()?.getParent()?.getParent()?.dispatch(
+    navigation.getParent()?.getParent()?.dispatch(
       CommonActions.reset({
         index: 0,
         routes: [{ name: 'Login' }],

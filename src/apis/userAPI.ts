@@ -56,7 +56,7 @@ export const userChangePasswordApi = async (
 };
 
 export const getUsersApi = async (): Promise<UserInfo[]> => {
-  const response = await axios.get('/api/Users');
+  const response = await axios.get('/api/users');
   return response.data;
 };
 

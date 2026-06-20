@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,7 +13,8 @@ import TcpSocket from 'react-native-tcp-socket';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WifiManager, { WifiEntry } from 'react-native-wifi-reborn';
 import { request, PERMISSIONS } from 'react-native-permissions';
-import { getDeviceId } from 'react-native-device-info';
+import uuid from 'react-native-uuid';
+import NetInfo, { NetInfoStateType } from '@react-native-community/netinfo';
 import ToastManager, { Toast } from 'toastify-react-native';
 
 import { colors } from '../themes/colors';
@@ -23,6 +24,7 @@ import Icon from '../components/Icon';
 import BackButtonHeader from '../components/BackButtonHeader';
 import CustomInput from '../components/CustomInput';
 import ActionButton from '../components/ActionButton';
+import AreaSelectionModal from '../components/scan/AreaSelectionModal';
 import {
   RouteProp,
   useNavigation,
@@ -30,8 +32,8 @@ import {
   CommonActions,
 } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '../store/store';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../store/store';
 import { addDevice } from '../slices/deviceSlice';
 import { AddDeviceRequest } from '../types/device';
 import { MyHomeStackParamList } from '../navigation';
@@ -47,7 +49,7 @@ enum ProvisioningStep {
   eInvalid_Provision,
 }
 
-type SetupStep = 'device_password' | 'connecting' | 'select_wifi' | 'provisioning';
+type SetupStep = 'area_selection' | 'device_password' | 'connecting' | 'select_wifi' | 'provisioning';
 
 const AddDevice = () => {
   const navigation =
@@ -55,13 +57,35 @@ const AddDevice = () => {
   const route = useRoute<RouteProp<MyHomeStackParamList, 'AddDevice'>>();
   const dispatch = useDispatch<AppDispatch>();
   const routeParams = route.params;
+  const { user } = useSelector((state: RootState) => state.user);
+  const { selectedSite } = useSelector((state: RootState) => state.site);
 
   const [wifiList, setWifiList] = useState<WifiEntry[]>([]);
-  const [modalVisible, setModalVisible] = useState(true);
-  const [setupStep, setSetupStep] = useState<SetupStep>('device_password');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [setupStep, setSetupStep] = useState<SetupStep>('area_selection');
+  const [meshId, setMeshId] = useState('');
+  const [deviceRole, setDeviceRole] = useState<number>(1);
   const [selectedDevicePassword, setSelectedDevicePassword] = useState('');
   const [selectedWifiPassword, setSelectedWifiPassword] = useState('');
   const [selectedWifi, setSelectedWifi] = useState<WifiEntry>();
+  const [boardType, setBoardType] = useState<number>(0);
+  const [deviceType, setDeviceType] = useState<number>(0);
+  const [deviceMac, setDeviceMac] = useState<string>('');
+
+  // Tracks whether provisioning is still active so stale NetInfo callbacks are ignored
+  const provisioningActiveRef = useRef(false);
+  // Holds the current NetInfo unsubscribe function
+  const netInfoUnsubRef = useRef<(() => void) | null>(null);
+  // Background reconnect state
+  const isReconnectingRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  // Mirror of selectedDevicePassword kept in a ref so the background reconnect
+  // function always reads the latest value without needing it as a dep.
+  const devicePasswordRef = useRef('');
+
+  useEffect(() => {
+    devicePasswordRef.current = selectedDevicePassword;
+  }, [selectedDevicePassword]);
 
   const loadHomeWifiList = useCallback(() => {
     WifiManager.loadWifiList()
@@ -71,15 +95,26 @@ const AddDevice = () => {
       });
   }, []);
 
+  const releaseWifiBinding = useCallback(() => {
+    provisioningActiveRef.current = false;
+    isReconnectingRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    netInfoUnsubRef.current?.();
+    netInfoUnsubRef.current = null;
+    WifiManager.forceWifiUsage(false).catch(() => { });
+  }, []);
+
   const goBackToScan = useCallback(
     (message: string) => {
+      releaseWifiBinding();
       setModalVisible(false);
       navigation.navigate('ScanDevice', { retryMessage: message });
     },
-    [navigation],
+    [navigation, releaseWifiBinding],
   );
 
   const goToHomeWithSuccess = useCallback(() => {
+    releaseWifiBinding();
     setModalVisible(false);
     navigation.dispatch(
       CommonActions.reset({
@@ -95,13 +130,127 @@ const AddDevice = () => {
       visibilityTime: 4000,
       autoHide: true,
     });
+  }, [navigation, releaseWifiBinding]);
+
+  const handleAreaConfirm = useCallback(
+    ({ meshId: mid, deviceRole: role }: { meshId: string; deviceRole: number }) => {
+      setMeshId(mid);
+      setDeviceRole(role);
+      setSetupStep('device_password');
+      setModalVisible(true);
+    },
+    [],
+  );
+
+  const handleAreaClose = useCallback(() => {
+    navigation.goBack();
   }, [navigation]);
 
+  // Release the WiFi binding and NetInfo listener when the screen unmounts.
   useEffect(() => {
-    if (!routeParams) {
-      navigation.goBack();
+    return () => {
+      provisioningActiveRef.current = false;
+      netInfoUnsubRef.current?.();
+      netInfoUnsubRef.current = null;
+      WifiManager.forceWifiUsage(false).catch(() => { });
+    };
+  }, []);
+
+  // Monitor the connected SSID during select_wifi and provisioning.
+  // If Android silently drops the device AP connection, abort and send the
+  // user back to the scan screen before any TCP message is lost.
+  useEffect(() => {
+    const shouldMonitor =
+      setupStep === 'select_wifi' || setupStep === 'provisioning';
+
+    netInfoUnsubRef.current?.();
+    netInfoUnsubRef.current = null;
+
+    if (!shouldMonitor || !routeParams?.deviceSSID) {
+      provisioningActiveRef.current = false;
+      return;
     }
-  }, [routeParams, navigation]);
+
+    provisioningActiveRef.current = true;
+    isReconnectingRef.current = false;
+    reconnectAttemptsRef.current = 0;
+
+    const MAX_RECONNECT = 3;
+
+    // Silently reconnect to the device AP in the background.
+    // The screen stays fully interactive — the user can still navigate away
+    // at any time. Only after MAX_RECONNECT consecutive failures do we give up
+    // and push back to the scan screen.
+    const attemptReconnect = async () => {
+      if (isReconnectingRef.current || !provisioningActiveRef.current) {
+        return;
+      }
+      isReconnectingRef.current = true;
+      Toast.show({
+        type: 'info',
+        text1: 'Reconnecting to device…',
+        text2: `Attempt ${reconnectAttemptsRef.current + 1} of ${MAX_RECONNECT}`,
+        position: 'top',
+        visibilityTime: 3000,
+        autoHide: true,
+      });
+      try {
+        await WifiManager.connectToProtectedSSID(
+          routeParams.deviceSSID,
+          devicePasswordRef.current,
+          false,
+          false,
+        );
+        await WifiManager.forceWifiUsage(true);
+        await new Promise<void>(r => setTimeout(() => r(), 1200));
+        const currentSsid = await WifiManager.getCurrentWifiSSID();
+        if (currentSsid !== routeParams.deviceSSID) {
+          throw new Error('ssid mismatch after reconnect');
+        }
+        // Reconnected — reset counters and resume monitoring
+        reconnectAttemptsRef.current = 0;
+        isReconnectingRef.current = false;
+        provisioningActiveRef.current = true;
+        Toast.show({
+          type: 'success',
+          text1: 'Reconnected to device',
+          position: 'top',
+          visibilityTime: 2000,
+          autoHide: true,
+        });
+      } catch {
+        reconnectAttemptsRef.current += 1;
+        isReconnectingRef.current = false;
+        if (reconnectAttemptsRef.current >= MAX_RECONNECT) {
+          provisioningActiveRef.current = false;
+          goBackToScan('Connection to device lost after multiple attempts. Please try again.');
+        } else {
+          // Keep monitoring active and retry after a short back-off
+          provisioningActiveRef.current = true;
+          setTimeout(attemptReconnect, 2500);
+        }
+      }
+    };
+
+    netInfoUnsubRef.current = NetInfo.addEventListener(state => {
+      if (!provisioningActiveRef.current || isReconnectingRef.current) {
+        return;
+      }
+      if (state.type === NetInfoStateType.wifi) {
+        const ssid = (state.details as { ssid?: string | null } | null)?.ssid;
+        // Only act when we actually received an SSID that differs from the
+        // device AP — a null/undefined SSID just means we cannot read it yet.
+        if (ssid && ssid !== routeParams.deviceSSID) {
+          attemptReconnect();
+        }
+      }
+    });
+
+    return () => {
+      netInfoUnsubRef.current?.();
+      netInfoUnsubRef.current = null;
+    };
+  }, [setupStep, routeParams?.deviceSSID, goBackToScan]);
 
   useEffect(() => {
     request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION, {
@@ -118,40 +267,48 @@ const AddDevice = () => {
       });
   }, [loadHomeWifiList]);
 
-  const connectToDeviceAp = useCallback(() => {
+  const connectToDeviceAp = useCallback(async () => {
     if (!routeParams?.deviceSSID || selectedDevicePassword.length < 8) {
       return;
     }
     setSetupStep('connecting');
-    WifiManager.disconnect().then(() => {
-      WifiManager.connectToProtectedSSID(
+
+    const verifySsid = async (expected: string, attempts = 6, intervalMs = 1500): Promise<boolean> => {
+      for (let i = 0; i < attempts; i++) {
+        await new Promise<void>(resolve => setTimeout(() => resolve(), intervalMs));
+        try {
+          const ssid = await WifiManager.getCurrentWifiSSID();
+          if (ssid === expected) {
+            return true;
+          }
+        } catch {
+          // ignore and retry
+        }
+      }
+      return false;
+    };
+
+    try {
+      await WifiManager.disconnect();
+      await WifiManager.connectToProtectedSSID(
         routeParams.deviceSSID,
         selectedDevicePassword,
         false,
         false,
-      )
-        .then(() => {
-          WifiManager.getCurrentWifiSSID().then(
-            currentSsid => {
-              if (currentSsid === routeParams.deviceSSID) {
-                loadHomeWifiList();
-                setSetupStep('select_wifi');
-              } else {
-                goBackToScan(
-                  'Could not connect to the device. Please try again.',
-                );
-              }
-            },
-            () =>
-              goBackToScan(
-                'Could not connect to the device. Please try again.',
-              ),
-          );
-        })
-        .catch(() =>
-          goBackToScan('Could not connect to the device. Please try again.'),
-        );
-    });
+      );
+      // Bind this process to the device AP so Android's smart-switching
+      // cannot silently hand us back to the home network mid-provisioning.
+      await WifiManager.forceWifiUsage(true);
+      const confirmed = await verifySsid(routeParams.deviceSSID);
+      if (confirmed) {
+        loadHomeWifiList();
+        setSetupStep('select_wifi');
+      } else {
+        goBackToScan('Could not connect to the device. Please try again.');
+      }
+    } catch {
+      goBackToScan('Could not connect to the device. Please try again.');
+    }
   }, [
     routeParams,
     selectedDevicePassword,
@@ -171,12 +328,16 @@ const AddDevice = () => {
       deviceType: number;
       userId: string;
     }) => {
-      if (!data.meshId) {
+      if (!data.meshId && data.deviceRole !== 1) {
+        return;
+      }
+      if (!selectedSite?.siteId) {
+        goBackToScan('No site selected. Please select a site and try again.');
         return;
       }
       try {
         const payload: AddDeviceRequest = {
-          siteId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+          siteId: selectedSite.siteId,
           meshId: data.meshId,
           srcMac: data.srcMac || '00:00:00:00:00:00',
           dstMac: data.dstMac || data.gatewayMac || '00:00:00:00:00:00',
@@ -198,28 +359,28 @@ const AddDevice = () => {
         );
       }
     },
-    [dispatch, goToHomeWithSuccess, goBackToScan],
+    [dispatch, goToHomeWithSuccess, goBackToScan, selectedSite],
   );
 
   const handleInitiateProvisioning = useCallback(
-    (wifiItem: WifiEntry) => {
+    async (wifiItem: WifiEntry) => {
+      if (!selectedSite?.siteId) {
+        goBackToScan('No site selected. Please select a site and try again.');
+        return;
+      }
+
       setSetupStep('provisioning');
-      const USER_ID = 'APP_USER_ID';
-      const deviceId = getDeviceId();
-      const meshId = 'aavitaRoom113#@';
-      const gatewayMac = 'AB:CD:E1:23:45';
-      const subGatewayMac = 'AB:CD:E1:23:45';
-      const deviceRole = 1;
-      const brokerUrl = 'http://ip:port';
-      const mqttUsrName = 'abcd134';
-      const mqttUsrPswd = 'mqttUsrPswd';
-      const lwtTopic = 'lwtTopic_name';
-      const mqttPubTopic = 'mqttPubTopic_name';
-      const mqttSubTopic = 'mqttSubTopic_name';
+      const USER_ID = user?.id || '';
+      const deviceId = uuid.v4() as string;
+      const gatewayMac = '';
+      const subGatewayMac = '';
+      const brokerUrl = 'http://64.227.160.209:1883';
       const Wifissid = wifiItem?.SSID;
       const Wifipswd = selectedWifiPassword;
+      const siteLocation = selectedSite.location ?? '';
 
       const provisionMeta = {
+        siteId: selectedSite.siteId,
         meshId,
         gatewayMac,
         subGatewayMac,
@@ -229,6 +390,8 @@ const AddDevice = () => {
         boardType: 0,
         deviceType: 0,
         userId: USER_ID,
+        deviceName: `${siteLocation} device`,
+        roomHint: siteLocation,
       };
 
       let provisionFailed = false;
@@ -265,6 +428,11 @@ const AddDevice = () => {
                 failProvisioning();
                 return;
               }
+              if (response.payloadType === 501) {
+                setBoardType(response.boardType);
+                setDeviceType(response.deviceType);
+                setDeviceMac(response.deviceMac);
+              }
               switch (step) {
                 case 1:
                   send({
@@ -294,11 +462,11 @@ const AddDevice = () => {
                     usrId: USER_ID,
                     deviceId,
                     brokerUrl,
-                    mqttUsrName,
-                    mqttUsrPswd,
-                    lwtTopic,
-                    mqttPubTopic,
-                    mqttSubTopic,
+                    mqttUsrName: deviceMac || '',
+                    mqttUsrPswd: `${deviceId.slice(0, 3)}${deviceMac.slice(0, 3)}` || '',
+                    lwtTopic: `${selectedSite.siteId}/lwt`,
+                    mqttPubTopic: `${selectedSite.siteId}/pub`,
+                    mqttSubTopic: `${selectedSite.siteId}/sub`,
                   });
                   step++;
                   break;
@@ -341,7 +509,7 @@ const AddDevice = () => {
       );
 
     },
-    [selectedWifiPassword, goBackToScan, addDeviceToBackend],
+    [selectedSite, user, meshId, deviceRole, selectedWifiPassword, goBackToScan, addDeviceToBackend],
   );
 
   const renderModalDeviceItem = useCallback(
@@ -467,10 +635,6 @@ const AddDevice = () => {
     setupStep === 'connecting' ||
     setupStep === 'provisioning';
 
-  if (!routeParams) {
-    return null;
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -504,7 +668,7 @@ const AddDevice = () => {
           }}
         >
           {isSmallModal ? (
-            <Pressable style={styles.smallModalWrap} onPress={() => {}}>
+            <Pressable style={styles.smallModalWrap} onPress={() => { }}>
               {renderModalContent()}
             </Pressable>
           ) : (
@@ -515,6 +679,12 @@ const AddDevice = () => {
           )}
         </Pressable>
       </Modal>
+      <AreaSelectionModal
+        visible={setupStep === 'area_selection'}
+        onClose={handleAreaClose}
+        onConfirm={handleAreaConfirm}
+      />
+
       <ToastManager config={{}} />
     </SafeAreaView>
   );

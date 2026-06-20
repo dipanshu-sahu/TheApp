@@ -111,7 +111,15 @@ export const updateUserProfile = createAsyncThunk<
 export const userSlice = createSlice({
   name: 'user',
   initialState,
-  reducers: {},
+  reducers: {
+    forceLogout: state => {
+      state.user = null;
+      state.isAuthenticated = false;
+      state.loginApi = createApiState();
+      state.fetchUserApi = createApiState();
+      state.updateProfileApi = createApiState();
+    },
+  },
   extraReducers: builder => {
     addAsyncCases(builder, userLogin, 'loginApi', 'user', state => {
       state.isAuthenticated = true;
@@ -149,5 +157,7 @@ export const userSlice = createSlice({
     addAsyncCases(builder, updateUserProfile, 'updateProfileApi', 'user');
   },
 });
+
+export const { forceLogout } = userSlice.actions;
 
 export default userSlice.reducer;

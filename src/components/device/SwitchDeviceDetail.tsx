@@ -1,15 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from '../Icon';
 import { colors } from '../../themes/colors';
 import { textFont } from '../../utils/textFont';
-import { getSwitchGangCount } from '../../utils/deviceDisplay';
+import { useSmartSwitchControl } from '../../hooks/useSmartSwitchControl';
+import { getSwitchGangCountFromDevice } from '../../utils/deviceMapper';
 import { DeviceInfo } from '../../types/device';
 import DeviceDetailHeader from './DeviceDetailHeader';
 import EditNameModal from './EditNameModal';
@@ -23,16 +25,31 @@ const SwitchDeviceDetail: React.FC<SwitchDeviceDetailProps> = ({
   device,
   onClose,
 }) => {
-  const gangCount = getSwitchGangCount(device.name);
+  const {
+    gangStates,
+    sortedPins,
+    isLoading,
+    isSending,
+    setGangAtIndex,
+    setAllGangs,
+  } = useSmartSwitchControl(device, { refreshOnMount: true });
+
+  const gangCount = sortedPins.length || getSwitchGangCountFromDevice(device);
   const defaultNames = useMemo(
-    () => Array.from({ length: gangCount }, (_, i) => `Switch ${i + 1}`),
-    [gangCount],
+    () =>
+      Array.from({ length: gangCount }, (_, i) => {
+        const pin = sortedPins[i];
+        return pin ? `Pin ${pin.pinNumber}` : `Switch ${i + 1}`;
+      }),
+    [gangCount, sortedPins],
   );
 
   const [gangNames, setGangNames] = useState(defaultNames);
-  const [gangStates, setGangStates] = useState<boolean[]>(() =>
-    Array.from({ length: gangCount }, () => device.status?.toLowerCase() === 'online'),
-  );
+
+  useEffect(() => {
+    setGangNames(defaultNames);
+  }, [defaultNames]);
+
   const [editVisible, setEditVisible] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -60,15 +77,10 @@ const SwitchDeviceDetail: React.FC<SwitchDeviceDetailProps> = ({
   };
 
   const toggleGang = (index: number) => {
-    setGangStates(prev => {
-      const next = [...prev];
-      next[index] = !next[index];
-      return next;
-    });
-  };
-
-  const setAllGangs = (value: boolean) => {
-    setGangStates(Array.from({ length: gangCount }, () => value));
+    if (isLoading || isSending) {
+      return;
+    }
+    setGangAtIndex(index, !gangStates[index]);
   };
 
   const gridRows = useMemo(() => {
@@ -79,40 +91,51 @@ const SwitchDeviceDetail: React.FC<SwitchDeviceDetailProps> = ({
     return rows;
   }, [gangCount]);
 
+  const controlsDisabled = isLoading || isSending;
+
   return (
     <View style={styles.container}>
       <DeviceDetailHeader title={device.name} onClose={onClose} />
 
-      <View style={styles.grid}>
-        {gridRows.map(row => (
-          <View key={row.join('-')} style={styles.gridRow}>
-            {row.map(index => {
-              const isOn = gangStates[index];
-              return (
-                <Pressable
-                  key={index}
-                  style={[styles.tile, isOn && styles.tileOn]}
-                  onPress={() => toggleGang(index)}
-                  onLongPress={() => openEdit(index)}
-                  delayLongPress={400}
-                >
-                  <Text style={[styles.tileLabel, isOn && styles.tileLabelOn]}>
-                    {gangNames[index]}
-                  </Text>
-                  {isOn ? <View style={styles.tileGlowLine} /> : null}
-                </Pressable>
-              );
-            })}
-            {row.length === 1 ? <View style={styles.tileSpacer} /> : null}
-          </View>
-        ))}
-      </View>
+      {isLoading ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingText}>Loading switch state…</Text>
+        </View>
+      ) : (
+        <View style={[styles.grid, controlsDisabled && styles.gridDisabled]}>
+          {gridRows.map(row => (
+            <View key={row.join('-')} style={styles.gridRow}>
+              {row.map(index => {
+                const isOn = gangStates[index] ?? false;
+                return (
+                  <Pressable
+                    key={index}
+                    style={[styles.tile, isOn && styles.tileOn]}
+                    onPress={() => toggleGang(index)}
+                    onLongPress={() => openEdit(index)}
+                    delayLongPress={400}
+                    disabled={controlsDisabled}
+                  >
+                    <Text style={[styles.tileLabel, isOn && styles.tileLabelOn]}>
+                      {gangNames[index] ?? `Switch ${index + 1}`}
+                    </Text>
+                    {isOn ? <View style={styles.tileGlowLine} /> : null}
+                  </Pressable>
+                );
+              })}
+              {row.length === 1 ? <View style={styles.tileSpacer} /> : null}
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.bottomBtn}
           onPress={() => setAllGangs(true)}
           activeOpacity={0.85}
+          disabled={controlsDisabled}
         >
           <View style={[styles.bottomCircle, styles.bottomCircleOn]}>
             <Text style={styles.bottomOnText}>ON</Text>
@@ -120,7 +143,7 @@ const SwitchDeviceDetail: React.FC<SwitchDeviceDetailProps> = ({
           <Text style={styles.bottomLabel}>All On</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.bottomBtn} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.bottomBtn} activeOpacity={0.85} disabled>
           <View style={styles.bottomCircle}>
             <Text style={styles.timerEmoji}>⏰</Text>
           </View>
@@ -142,6 +165,7 @@ const SwitchDeviceDetail: React.FC<SwitchDeviceDetailProps> = ({
           style={styles.bottomBtn}
           onPress={() => setAllGangs(false)}
           activeOpacity={0.85}
+          disabled={controlsDisabled}
         >
           <View style={[styles.bottomCircle, styles.bottomCircleOff]}>
             <Text style={styles.bottomOffText}>OFF</Text>
@@ -149,6 +173,13 @@ const SwitchDeviceDetail: React.FC<SwitchDeviceDetailProps> = ({
           <Text style={styles.bottomLabel}>All Off</Text>
         </TouchableOpacity>
       </View>
+
+      {isSending ? (
+        <View style={styles.sendingBar}>
+          <ActivityIndicator color={colors.accent} size="small" />
+          <Text style={styles.sendingText}>Sending command…</Text>
+        </View>
+      ) : null}
 
       <EditNameModal
         visible={editVisible}
@@ -165,10 +196,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loadingBox: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    ...textFont.regularM,
+    color: colors.textSecondary,
+  },
   grid: {
     flex: 1,
     gap: 12,
     paddingTop: 8,
+  },
+  gridDisabled: {
+    opacity: 0.75,
   },
   gridRow: {
     flex: 1,
@@ -248,6 +292,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   bottomLabel: {
+    ...textFont.regularS,
+    color: colors.textSecondary,
+  },
+  sendingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingBottom: 4,
+  },
+  sendingText: {
     ...textFont.regularS,
     color: colors.textSecondary,
   },

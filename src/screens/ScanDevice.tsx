@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useDispatch, useSelector } from 'react-redux';
 import { MyHomeStackParamList } from '../navigation';
 import WifiManager, { WifiEntry } from 'react-native-wifi-reborn';
 import { request, PERMISSIONS } from 'react-native-permissions';
@@ -21,6 +22,10 @@ import ToastManager, { Toast } from 'toastify-react-native';
 import { colors } from '../themes/colors';
 import { textFont } from '../utils/textFont';
 import Icon, { IconName } from '../components/Icon';
+import { AppDispatch, RootState } from '../store/store';
+import { selectSite } from '../slices/siteSlice';
+import SiteDropdown from '../components/site/SiteDropdown';
+import CreateSiteModal from '../components/site/CreateSiteModal';
 
 type ManualItem = { label: string; icon: IconName };
 
@@ -98,10 +103,13 @@ const ScanDevice = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<MyHomeStackParamList>>();
   const route = useRoute<RouteProp<MyHomeStackParamList, 'ScanDevice'>>();
+  const dispatch = useDispatch<AppDispatch>();
+  const { selectedSite } = useSelector((state: RootState) => state.site);
 
   const [isScanning, setIsScanning] = useState(true);
   const [wifiList, setWifiList] = useState<WifiEntry[]>([]);
   const [categoryQuery, setCategoryQuery] = useState('');
+  const [showCreateSite, setShowCreateSite] = useState(false);
 
   const loadWifiList = useCallback(() => {
     setIsScanning(true);
@@ -164,12 +172,23 @@ const ScanDevice = () => {
 
   const handleSelectDevice = useCallback(
     (item: WifiEntry) => {
+      if (!selectedSite) {
+        Toast.show({
+          type: 'error',
+          text1: 'No site selected',
+          text2: 'Please select a site first.',
+          position: 'top',
+          visibilityTime: 3000,
+          autoHide: true,
+        });
+        return;
+      }
       navigation.navigate('AddDevice', {
         deviceSSID: item.SSID,
         deviceBSSID: item.BSSID,
       });
     },
-    [navigation],
+    [navigation, selectedSite],
   );
 
   const handleManualSelect = useCallback(() => {
@@ -198,6 +217,10 @@ const ScanDevice = () => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.siteDropdownWrapper}>
+          <SiteDropdown onAddSite={() => setShowCreateSite(true)} />
+        </View>
+
         <View style={styles.scanSection}>
           <Text style={styles.scanTitle}>
             {isScanning ? 'Searching for nearby devices...' : 'Nearby devices'}
@@ -294,6 +317,16 @@ const ScanDevice = () => {
           ))}
         </View>
       </ScrollView>
+
+      <CreateSiteModal
+        visible={showCreateSite}
+        onClose={() => setShowCreateSite(false)}
+        onCreated={site => {
+          dispatch(selectSite(site));
+          setShowCreateSite(false);
+        }}
+      />
+
       <ToastManager config={{}} />
     </SafeAreaView>
   );
@@ -319,6 +352,10 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 40,
+  },
+  siteDropdownWrapper: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
   },
   scanSection: {
     paddingHorizontal: 20,

@@ -7,7 +7,9 @@ import BootSplash from 'react-native-bootsplash';
 import AppNavigator from './navigation';
 import store, { RootState, AppDispatch } from './store/store';
 import { restoreSession } from './slices/userSlice';
+import { loadPersistedSite } from './slices/siteSlice';
 import { colors } from './themes/colors';
+import { navigationRef } from './utils/NavigationService';
 
 const AppRoot = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -17,6 +19,7 @@ const AppRoot = () => {
 
   useEffect(() => {
     dispatch(restoreSession());
+    dispatch(loadPersistedSite());
   }, [dispatch]);
 
   if (isRestoringSession) {
@@ -35,6 +38,7 @@ export default () => {
     <Provider store={store}>
       <SafeAreaProvider>
         <NavigationContainer
+          ref={navigationRef}
           onReady={() => {
             BootSplash.hide({ fade: true });
           }}

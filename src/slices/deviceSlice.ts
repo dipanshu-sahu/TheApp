@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import { getDevicesApi, addDeviceApi, getDeviceByIdApi } from '../apis/deviceAPI';
-import { DeviceInfo, AddDeviceRequest } from '../types/device';
+import { getDevicesApi, getDevicesBySiteApi, addDeviceApi, getDeviceByIdApi } from '../apis/deviceAPI';
+import { ApiDevice, DeviceInfo, AddDeviceRequest } from '../types/device';
+import { mapApiDeviceToDeviceInfo, mapApiDevicesResponse } from '../utils/deviceMapper';
 
 type DeviceState = {
   devices: DeviceInfo[];
@@ -18,40 +19,24 @@ const initialState: DeviceState = {
   error: null,
 };
 
-export const fetchDevices = createAsyncThunk<DeviceInfo[]>(
+export const fetchDevices = createAsyncThunk<ApiDevice[]>(
   'devices/fetchDevices',
-  async () => {
-    try {
-      const response = await getDevicesApi();
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  },
+  async () => getDevicesApi(),
 );
 
-export const addDevice = createAsyncThunk<DeviceInfo, AddDeviceRequest>(
+export const fetchDevicesBySite = createAsyncThunk<ApiDevice[], string>(
+  'devices/fetchDevicesBySite',
+  async siteId => getDevicesBySiteApi(siteId),
+);
+
+export const addDevice = createAsyncThunk<ApiDevice, AddDeviceRequest>(
   'devices/addDevice',
-  async (payload) => {
-    try {
-      const response = await addDeviceApi(payload);
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  },
+  async payload => addDeviceApi(payload),
 );
 
-export const fetchDeviceById = createAsyncThunk<DeviceInfo, string>(
+export const fetchDeviceById = createAsyncThunk<ApiDevice, string>(
   'devices/fetchDeviceById',
-  async (deviceId) => {
-    try {
-      const response = await getDeviceByIdApi(deviceId);
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  },
+  async deviceId => getDeviceByIdApi(deviceId),
 );
 
 export const deviceSlice = createSlice({
@@ -66,9 +51,21 @@ export const deviceSlice = createSlice({
       })
       .addCase(fetchDevices.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.devices = action.payload || [];
+        state.devices = mapApiDevicesResponse(action.payload);
       })
       .addCase(fetchDevices.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Failed to fetch devices';
+      })
+      .addCase(fetchDevicesBySite.pending, state => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchDevicesBySite.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.devices = mapApiDevicesResponse(action.payload);
+      })
+      .addCase(fetchDevicesBySite.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.error.message || 'Failed to fetch devices';
       })
@@ -78,7 +75,7 @@ export const deviceSlice = createSlice({
       })
       .addCase(addDevice.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.devices.push(action.payload);
+        state.devices.push(mapApiDeviceToDeviceInfo(action.payload));
       })
       .addCase(addDevice.rejected, (state, action) => {
         state.isLoading = false;
@@ -90,7 +87,7 @@ export const deviceSlice = createSlice({
       })
       .addCase(fetchDeviceById.fulfilled, (state, action) => {
         state.isLoadingDetails = false;
-        state.deviceDetails = action.payload;
+        state.deviceDetails = mapApiDeviceToDeviceInfo(action.payload);
       })
       .addCase(fetchDeviceById.rejected, (state, action) => {
         state.isLoadingDetails = false;

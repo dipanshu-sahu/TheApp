@@ -1,31 +1,70 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useSelector } from 'react-redux';
+
 import Icon from '../Icon';
 import { colors } from '../../themes/colors';
 import { textFont } from '../../utils/textFont';
+import { RootState } from '../../store/store';
+import {
+  formatTemperature,
+  getWeatherIconName,
+} from '../../utils/weatherDisplay';
 
-const WeatherWidget: React.FC = () => (
-  <View style={styles.wrapper}>
-    <Icon
-      name="weather-card-bg"
-      width="100%"
-      height="100%"
-      style={StyleSheet.absoluteFill}
-      preserveAspectRatio="none"
-    />
-    <View style={styles.content}>
-      <View style={styles.left}>
-        <View style={styles.locationRow}>
-          <Icon name="location-pin" width={14} height={14} />
-          <Text style={styles.location}>Noida, UP</Text>
+const WeatherWidget: React.FC = () => {
+  const {
+    locationLabel,
+    temperature,
+    weatherCode,
+    condition,
+    isLoading,
+    error,
+  } = useSelector((state: RootState) => state.weather);
+
+  const weatherIcon =
+    weatherCode !== null ? getWeatherIconName(weatherCode) : 'partly-cloudy';
+  const temperatureLabel =
+    temperature !== null ? formatTemperature(temperature) : '--°';
+  const conditionLabel = condition || (isLoading ? 'Loading…' : '—');
+
+  return (
+    <View style={styles.wrapper}>
+      <Icon
+        name="weather-card-bg"
+        style={styles.background}
+        preserveAspectRatio="none"
+      />
+      <View style={styles.content}>
+        <View style={styles.left}>
+          <View style={styles.locationRow}>
+            <Icon name="location-pin" width={14} height={14} />
+            <Text style={styles.location} numberOfLines={1}>
+              {locationLabel}
+            </Text>
+          </View>
+
+          {isLoading ? (
+            <ActivityIndicator
+              color={colors.accent}
+              style={styles.loader}
+            />
+          ) : (
+            <>
+              <Text style={styles.temperature}>{temperatureLabel}</Text>
+              <Text style={styles.condition} numberOfLines={1}>
+                {error ? 'Weather unavailable' : conditionLabel}
+              </Text>
+            </>
+          )}
         </View>
-        <Text style={styles.temperature}>32°</Text>
-        <Text style={styles.condition}>Partly Cloudy</Text>
+
+        {!isLoading ? (
+          <Icon name={weatherIcon} width={72} height={72} />
+        ) : null}
       </View>
-      <Icon name="partly-cloudy" width={72} height={72} />
     </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -33,6 +72,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 24,
+    position: 'relative',
+  },
+  background: {
+    ...StyleSheet.absoluteFill,
+    width: '100%',
+    height: '100%',
   },
   content: {
     flex: 1,
@@ -44,6 +89,7 @@ const styles = StyleSheet.create({
   },
   left: {
     flex: 1,
+    paddingRight: 12,
   },
   locationRow: {
     flexDirection: 'row',
@@ -54,6 +100,11 @@ const styles = StyleSheet.create({
   location: {
     ...textFont.regularS,
     color: colors.textSecondary,
+    flex: 1,
+  },
+  loader: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
   },
   temperature: {
     ...textFont.boldXXXL,
