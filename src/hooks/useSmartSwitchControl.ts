@@ -73,7 +73,6 @@ export const useSmartSwitchControl = (
 
   const sendPin = useCallback(
     async (pinNumber: number, on: boolean) => {
-      console.log('sendPin', pinNumber, on);
       await sendDevicePinCommand(deviceWithPins, pinNumber, on);
     },
     [deviceWithPins],

@@ -25,6 +25,7 @@ import { userRegisterApi } from '../apis/userAPI';
 import { userRegisterRequest } from '../types/user';
 import { validateField, isFieldValid } from '../utils/validators';
 import { splitFullName } from '../utils/passwordStrength';
+import { extractErrorMessage } from '../utils/extractErrorMessage';
 
 type FormField =
   | 'fullName'
@@ -82,21 +83,6 @@ const SignUp = () => {
     return Object.values(validationErrors).every(message => !message);
   };
 
-  const extractErrorMessage = (error: unknown) => {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'response' in error &&
-      typeof (error as any).response?.data?.message === 'string'
-    ) {
-      return (error as any).response.data.message;
-    }
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return 'Unable to register. Please try again.';
-  };
-
   const handleRegister = async () => {
     if (isSubmitting) {
       return;
@@ -130,7 +116,7 @@ const SignUp = () => {
       await userRegisterApi(payload);
       navigation.navigate('Login' as never);
     } catch (error) {
-      setFormError(extractErrorMessage(error));
+      setFormError(extractErrorMessage(error, 'Unable to register. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }

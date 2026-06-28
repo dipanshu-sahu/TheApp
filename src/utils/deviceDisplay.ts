@@ -1,4 +1,4 @@
-import { IconName } from '../components/Icon';
+import { IconName } from '../types/icons';
 import { DEVICE_TYPE_SMART_SWITCH, DeviceInfo } from '../types/device';
 import { colors } from '../themes/colors';
 

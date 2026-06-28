@@ -8,14 +8,22 @@ import {
   Modal,
   ActivityIndicator,
   Pressable,
+  Platform,
 } from 'react-native';
-import TcpSocket from 'react-native-tcp-socket';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WifiManager, { WifiEntry } from 'react-native-wifi-reborn';
 import { request, PERMISSIONS } from 'react-native-permissions';
 import uuid from 'react-native-uuid';
 import NetInfo, { NetInfoStateType } from '@react-native-community/netinfo';
 import ToastManager, { Toast } from 'toastify-react-native';
+import {
+  RouteProp,
+  useNavigation,
+  useRoute,
+  CommonActions,
+} from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { colors } from '../themes/colors';
 import Gap from '../components/Gap';
@@ -25,38 +33,22 @@ import BackButtonHeader from '../components/BackButtonHeader';
 import CustomInput from '../components/CustomInput';
 import ActionButton from '../components/ActionButton';
 import AreaSelectionModal from '../components/scan/AreaSelectionModal';
-import {
-  RouteProp,
-  useNavigation,
-  useRoute,
-  CommonActions,
-} from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
 import { addDevice } from '../slices/deviceSlice';
 import { AddDeviceRequest } from '../types/device';
 import { MyHomeStackParamList } from '../navigation';
-
-enum ProvisioningStep {
-  eResponse_D2A_Provision = 300,
-  eResponse_D2C_Provision = 400,
-  eUserDetails_A2D_Provision = 201,
-  eMeshDetails_A2D_Provision,
-  eMqttDetails_A2D_Provision,
-  eDeviceDetails_A2D_Provision,
-  eDataExchangeDone_A2D_Provision,
-  eInvalid_Provision,
-}
+import {
+  runProvisioningProtocol,
+  ProvisioningResult,
+} from '../services/provisioningService';
 
 type SetupStep = 'area_selection' | 'device_password' | 'connecting' | 'select_wifi' | 'provisioning';
+const MAX_RECONNECT = 3;
 
 const AddDevice = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<MyHomeStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<MyHomeStackParamList>>();
   const route = useRoute<RouteProp<MyHomeStackParamList, 'AddDevice'>>();
   const dispatch = useDispatch<AppDispatch>();
-  const routeParams = route.params;
   const { user } = useSelector((state: RootState) => state.user);
   const { selectedSite } = useSelector((state: RootState) => state.site);
 
@@ -68,19 +60,11 @@ const AddDevice = () => {
   const [selectedDevicePassword, setSelectedDevicePassword] = useState('');
   const [selectedWifiPassword, setSelectedWifiPassword] = useState('');
   const [selectedWifi, setSelectedWifi] = useState<WifiEntry>();
-  const [boardType, setBoardType] = useState<number>(0);
-  const [deviceType, setDeviceType] = useState<number>(0);
-  const [deviceMac, setDeviceMac] = useState<string>('');
 
-  // Tracks whether provisioning is still active so stale NetInfo callbacks are ignored
   const provisioningActiveRef = useRef(false);
-  // Holds the current NetInfo unsubscribe function
   const netInfoUnsubRef = useRef<(() => void) | null>(null);
-  // Background reconnect state
   const isReconnectingRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
-  // Mirror of selectedDevicePassword kept in a ref so the background reconnect
-  // function always reads the latest value without needing it as a dep.
   const devicePasswordRef = useRef('');
 
   useEffect(() => {
@@ -90,9 +74,7 @@ const AddDevice = () => {
   const loadHomeWifiList = useCallback(() => {
     WifiManager.loadWifiList()
       .then(list => setWifiList(list.filter(item => item.SSID?.trim().length > 0)))
-      .catch(error => {
-        console.log({ error });
-      });
+      .catch(() => {});
   }, []);
 
   const releaseWifiBinding = useCallback(() => {
@@ -101,7 +83,7 @@ const AddDevice = () => {
     reconnectAttemptsRef.current = 0;
     netInfoUnsubRef.current?.();
     netInfoUnsubRef.current = null;
-    WifiManager.forceWifiUsage(false).catch(() => { });
+    WifiManager.forceWifiUsage(false).catch(() => {});
   }, []);
 
   const goBackToScan = useCallback(
@@ -116,12 +98,7 @@ const AddDevice = () => {
   const goToHomeWithSuccess = useCallback(() => {
     releaseWifiBinding();
     setModalVisible(false);
-    navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [{ name: 'Home' }],
-      }),
-    );
+    navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Home' }] }));
     Toast.show({
       type: 'success',
       text1: 'Device added successfully!',
@@ -132,41 +109,21 @@ const AddDevice = () => {
     });
   }, [navigation, releaseWifiBinding]);
 
-  const handleAreaConfirm = useCallback(
-    ({ meshId: mid, deviceRole: role }: { meshId: string; deviceRole: number }) => {
-      setMeshId(mid);
-      setDeviceRole(role);
-      setSetupStep('device_password');
-      setModalVisible(true);
-    },
-    [],
-  );
-
-  const handleAreaClose = useCallback(() => {
-    navigation.goBack();
-  }, [navigation]);
-
-  // Release the WiFi binding and NetInfo listener when the screen unmounts.
   useEffect(() => {
     return () => {
       provisioningActiveRef.current = false;
       netInfoUnsubRef.current?.();
       netInfoUnsubRef.current = null;
-      WifiManager.forceWifiUsage(false).catch(() => { });
+      WifiManager.forceWifiUsage(false).catch(() => {});
     };
   }, []);
 
-  // Monitor the connected SSID during select_wifi and provisioning.
-  // If Android silently drops the device AP connection, abort and send the
-  // user back to the scan screen before any TCP message is lost.
   useEffect(() => {
-    const shouldMonitor =
-      setupStep === 'select_wifi' || setupStep === 'provisioning';
-
+    const shouldMonitor = setupStep === 'select_wifi' || setupStep === 'provisioning';
     netInfoUnsubRef.current?.();
     netInfoUnsubRef.current = null;
 
-    if (!shouldMonitor || !routeParams?.deviceSSID) {
+    if (!shouldMonitor || !route.params?.deviceSSID) {
       provisioningActiveRef.current = false;
       return;
     }
@@ -175,12 +132,6 @@ const AddDevice = () => {
     isReconnectingRef.current = false;
     reconnectAttemptsRef.current = 0;
 
-    const MAX_RECONNECT = 3;
-
-    // Silently reconnect to the device AP in the background.
-    // The screen stays fully interactive — the user can still navigate away
-    // at any time. Only after MAX_RECONNECT consecutive failures do we give up
-    // and push back to the scan screen.
     const attemptReconnect = async () => {
       if (isReconnectingRef.current || !provisioningActiveRef.current) {
         return;
@@ -196,28 +147,21 @@ const AddDevice = () => {
       });
       try {
         await WifiManager.connectToProtectedSSID(
-          routeParams.deviceSSID,
+          route.params.deviceSSID,
           devicePasswordRef.current,
           false,
           false,
         );
         await WifiManager.forceWifiUsage(true);
-        await new Promise<void>(r => setTimeout(() => r(), 1200));
+        await new Promise<void>(r => setTimeout(r, 1200));
         const currentSsid = await WifiManager.getCurrentWifiSSID();
-        if (currentSsid !== routeParams.deviceSSID) {
+        if (currentSsid !== route.params.deviceSSID) {
           throw new Error('ssid mismatch after reconnect');
         }
-        // Reconnected — reset counters and resume monitoring
         reconnectAttemptsRef.current = 0;
         isReconnectingRef.current = false;
         provisioningActiveRef.current = true;
-        Toast.show({
-          type: 'success',
-          text1: 'Reconnected to device',
-          position: 'top',
-          visibilityTime: 2000,
-          autoHide: true,
-        });
+        Toast.show({ type: 'success', text1: 'Reconnected to device', position: 'top', visibilityTime: 2000, autoHide: true });
       } catch {
         reconnectAttemptsRef.current += 1;
         isReconnectingRef.current = false;
@@ -225,7 +169,6 @@ const AddDevice = () => {
           provisioningActiveRef.current = false;
           goBackToScan('Connection to device lost after multiple attempts. Please try again.');
         } else {
-          // Keep monitoring active and retry after a short back-off
           provisioningActiveRef.current = true;
           setTimeout(attemptReconnect, 2500);
         }
@@ -238,9 +181,7 @@ const AddDevice = () => {
       }
       if (state.type === NetInfoStateType.wifi) {
         const ssid = (state.details as { ssid?: string | null } | null)?.ssid;
-        // Only act when we actually received an SSID that differs from the
-        // device AP — a null/undefined SSID just means we cannot read it yet.
-        if (ssid && ssid !== routeParams.deviceSSID) {
+        if (ssid && ssid !== route.params.deviceSSID) {
           attemptReconnect();
         }
       }
@@ -250,56 +191,47 @@ const AddDevice = () => {
       netInfoUnsubRef.current?.();
       netInfoUnsubRef.current = null;
     };
-  }, [setupStep, routeParams?.deviceSSID, goBackToScan]);
+  }, [setupStep, route.params?.deviceSSID, goBackToScan]);
 
   useEffect(() => {
-    request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION, {
+    const permission =
+      Platform.OS === 'ios'
+        ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
+        : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
+    request(permission, {
       title: 'Location permission is required for WiFi connections',
-      message:
-        'This app needs location permission as this is required  ' +
-        'to scan for wifi networks.',
+      message: 'This app needs location permission to scan for WiFi networks.',
       buttonNegative: 'DENY',
       buttonPositive: 'ALLOW',
     })
       .then(() => loadHomeWifiList())
-      .catch(error => {
-        console.log(error);
-      });
+      .catch(() => {});
   }, [loadHomeWifiList]);
 
   const connectToDeviceAp = useCallback(async () => {
-    if (!routeParams?.deviceSSID || selectedDevicePassword.length < 8) {
+    if (!route.params?.deviceSSID || selectedDevicePassword.length < 8) {
       return;
     }
     setSetupStep('connecting');
 
     const verifySsid = async (expected: string, attempts = 6, intervalMs = 1500): Promise<boolean> => {
       for (let i = 0; i < attempts; i++) {
-        await new Promise<void>(resolve => setTimeout(() => resolve(), intervalMs));
+        await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
         try {
           const ssid = await WifiManager.getCurrentWifiSSID();
           if (ssid === expected) {
             return true;
           }
-        } catch {
-          // ignore and retry
-        }
+        } catch { /* retry */ }
       }
       return false;
     };
 
     try {
       await WifiManager.disconnect();
-      await WifiManager.connectToProtectedSSID(
-        routeParams.deviceSSID,
-        selectedDevicePassword,
-        false,
-        false,
-      );
-      // Bind this process to the device AP so Android's smart-switching
-      // cannot silently hand us back to the home network mid-provisioning.
+      await WifiManager.connectToProtectedSSID(route.params.deviceSSID, selectedDevicePassword, false, false);
       await WifiManager.forceWifiUsage(true);
-      const confirmed = await verifySsid(routeParams.deviceSSID);
+      const confirmed = await verifySsid(route.params.deviceSSID);
       if (confirmed) {
         loadHomeWifiList();
         setSetupStep('select_wifi');
@@ -309,28 +241,10 @@ const AddDevice = () => {
     } catch {
       goBackToScan('Could not connect to the device. Please try again.');
     }
-  }, [
-    routeParams,
-    selectedDevicePassword,
-    loadHomeWifiList,
-    goBackToScan,
-  ]);
+  }, [route.params, selectedDevicePassword, loadHomeWifiList, goBackToScan]);
 
   const addDeviceToBackend = useCallback(
-    async (data: {
-      meshId: string;
-      gatewayMac: string;
-      subGatewayMac: string;
-      deviceRole: number;
-      srcMac: string;
-      dstMac: string;
-      boardType: number;
-      deviceType: number;
-      userId: string;
-    }) => {
-      if (!data.meshId && data.deviceRole !== 1) {
-        return;
-      }
+    async (meta: ProvisioningResult) => {
       if (!selectedSite?.siteId) {
         goBackToScan('No site selected. Please select a site and try again.');
         return;
@@ -338,24 +252,21 @@ const AddDevice = () => {
       try {
         const payload: AddDeviceRequest = {
           siteId: selectedSite.siteId,
-          meshId: data.meshId,
-          srcMac: data.srcMac || '00:00:00:00:00:00',
-          dstMac: data.dstMac || data.gatewayMac || '00:00:00:00:00:00',
-          gatewayMac: data.gatewayMac || '00:00:00:00:00:00',
-          subGatewayMac: data.subGatewayMac || '00:00:00:00:00:00',
-          boardType: data.boardType ?? 0,
-          deviceType: data.deviceType ?? 0,
-          deviceRole: data.deviceRole ?? 0,
-          userId: data.userId || '',
+          meshId: meta.meshId,
+          srcMac: meta.srcMac || '00:00:00:00:00:00',
+          dstMac: meta.dstMac || meta.gatewayMac || '00:00:00:00:00:00',
+          gatewayMac: meta.gatewayMac || '00:00:00:00:00:00',
+          subGatewayMac: meta.subGatewayMac || '00:00:00:00:00:00',
+          boardType: meta.boardType,
+          deviceType: meta.deviceType,
+          deviceRole: meta.deviceRole,
+          userId: meta.userId,
         };
-
         await dispatch(addDevice(payload)).unwrap();
         goToHomeWithSuccess();
       } catch (error) {
         goBackToScan(
-          error instanceof Error
-            ? error.message
-            : 'Failed to add device. Please try again.',
+          error instanceof Error ? error.message : 'Failed to add device. Please try again.',
         );
       }
     },
@@ -370,171 +281,51 @@ const AddDevice = () => {
       }
 
       setSetupStep('provisioning');
-      const USER_ID = user?.id || '';
-      const deviceId = uuid.v4() as string;
-      const gatewayMac = '';
-      const subGatewayMac = '';
-      const brokerUrl = 'http://64.227.160.209:1883';
-      const Wifissid = wifiItem?.SSID;
-      const Wifipswd = selectedWifiPassword;
-      const siteLocation = selectedSite.location ?? '';
 
-      const provisionMeta = {
-        siteId: selectedSite.siteId,
-        meshId,
-        gatewayMac,
-        subGatewayMac,
-        deviceRole,
-        srcMac: deviceId || '00:00:00:00:00:00',
-        dstMac: gatewayMac,
-        boardType: 0,
-        deviceType: 0,
-        userId: USER_ID,
-        deviceName: `${siteLocation} device`,
-        roomHint: siteLocation,
-      };
-
-      let provisionFailed = false;
-      const failProvisioning = () => {
-        if (provisionFailed) {
-          return;
-        }
-        provisionFailed = true;
-        goBackToScan('Provisioning failed. Please try again.');
-      };
-
-      const client = TcpSocket.createConnection(
-        { port: 3333, host: '192.168.10.1' },
-        () => {
-          let step = 1;
-          let stopped = false;
-          const send = (obj: Record<string, unknown>) =>
-            client.write(JSON.stringify(obj));
-
-          send({
-            payloadType: ProvisioningStep.eUserDetails_A2D_Provision,
-            usrId: USER_ID,
-          });
-
-          client.on('data', data => {
-            if (stopped) {
-              return;
-            }
-            try {
-              const response = JSON.parse(data.toString());
-              if (response.status === -1) {
-                stopped = true;
-                client.destroy();
-                failProvisioning();
-                return;
-              }
-              if (response.payloadType === 501) {
-                setBoardType(response.boardType);
-                setDeviceType(response.deviceType);
-                setDeviceMac(response.deviceMac);
-              }
-              switch (step) {
-                case 1:
-                  send({
-                    payloadType: ProvisioningStep.eMeshDetails_A2D_Provision,
-                    usrId: USER_ID,
-                    deviceId,
-                    Wifissid,
-                    Wifipswd,
-                  });
-                  step++;
-                  break;
-                case 2:
-                  send({
-                    payloadType: ProvisioningStep.eMqttDetails_A2D_Provision,
-                    usrId: USER_ID,
-                    deviceId,
-                    meshId,
-                    gatewayMac,
-                    subGatewayMac,
-                    deviceRole,
-                  });
-                  step++;
-                  break;
-                case 3:
-                  send({
-                    payloadType: ProvisioningStep.eDeviceDetails_A2D_Provision,
-                    usrId: USER_ID,
-                    deviceId,
-                    brokerUrl,
-                    mqttUsrName: deviceMac || '',
-                    mqttUsrPswd: `${deviceId.slice(0, 3)}${deviceMac.slice(0, 3)}` || '',
-                    lwtTopic: `${selectedSite.siteId}/lwt`,
-                    mqttPubTopic: `${selectedSite.siteId}/pub`,
-                    mqttSubTopic: `${selectedSite.siteId}/sub`,
-                  });
-                  step++;
-                  break;
-                case 4:
-                  send({
-                    payloadType:
-                      ProvisioningStep.eDataExchangeDone_A2D_Provision,
-                    usrId: USER_ID,
-                    deviceId,
-                  });
-                  step++;
-                  break;
-                case 5:
-                  stopped = true;
-                  client.destroy();
-                  addDeviceToBackend(provisionMeta);
-                  break;
-                default:
-                  break;
-              }
-            } catch {
-              stopped = true;
-              client.destroy();
-              failProvisioning();
-            }
-          });
-
-          client.on('error', () => {
-            stopped = true;
-            client.destroy();
-            failProvisioning();
-          });
-
-          client.on('close', () => {
-            if (!stopped) {
-              failProvisioning();
-            }
-          });
-        },
-      );
-
+      try {
+        const result = await runProvisioningProtocol({
+          userId: String(user?.id) || '',
+          deviceId: uuid.v4() as string,
+          wifiSsid: wifiItem.SSID,
+          wifiPassword: selectedWifiPassword,
+          meshId,
+          gatewayMac: '',
+          subGatewayMac: '',
+          deviceRole,
+          siteId: selectedSite.siteId,
+          siteLocation: selectedSite.location ?? '',
+        });
+        await addDeviceToBackend(result);
+      } catch (error) {
+        goBackToScan(
+          error instanceof Error ? error.message : 'Provisioning failed. Please try again.',
+        );
+      }
     },
     [selectedSite, user, meshId, deviceRole, selectedWifiPassword, goBackToScan, addDeviceToBackend],
+  );
+
+  const handleAreaConfirm = useCallback(
+    ({ meshId: mid, deviceRole: role }: { meshId: string; deviceRole: number }) => {
+      setMeshId(mid);
+      setDeviceRole(role);
+      setSetupStep('device_password');
+      setModalVisible(true);
+    },
+    [],
   );
 
   const renderModalDeviceItem = useCallback(
     ({ item }: { item: WifiEntry }) => (
       <>
-        <TouchableOpacity
-          style={styles.modalDeviceItem}
-          onPress={() => setSelectedWifi(item)}
-        >
+        <TouchableOpacity style={styles.modalDeviceItem} onPress={() => setSelectedWifi(item)}>
           <Text style={styles.deviceText}>{item.SSID}</Text>
-          {selectedWifi?.BSSID === item.BSSID ? (
-            <Icon
-              name="arrow-down"
-              width={14}
-              height={14}
-              fill={colors.greyLight}
-            />
-          ) : (
-            <Icon
-              name="arrow-next"
-              width={20}
-              height={20}
-              fill={colors.greyLight}
-            />
-          )}
+          <Icon
+            name={selectedWifi?.BSSID === item.BSSID ? 'arrow-down' : 'arrow-next'}
+            width={selectedWifi?.BSSID === item.BSSID ? 14 : 20}
+            height={selectedWifi?.BSSID === item.BSSID ? 14 : 20}
+            fill={colors.greyLight}
+          />
         </TouchableOpacity>
         {selectedWifi?.BSSID === item.BSSID ? (
           <View>
@@ -566,9 +357,7 @@ const AddDevice = () => {
         return (
           <View style={styles.smallModalCard}>
             <Text style={styles.smallModalTitle}>Device Password</Text>
-            <Text style={styles.smallModalSubtitle}>
-              Enter the password for {routeParams?.deviceSSID}
-            </Text>
+            <Text style={styles.smallModalSubtitle}>Enter the password for {route.params?.deviceSSID}</Text>
             <Gap type="m" />
             <CustomInput
               icon="password-lock"
@@ -579,42 +368,29 @@ const AddDevice = () => {
               isPassword
             />
             <Gap type="l" />
-            <ActionButton
-              title="Connect"
-              onPress={connectToDeviceAp}
-              isDisable={selectedDevicePassword.length < 8}
-            />
+            <ActionButton title="Connect" onPress={connectToDeviceAp} isDisable={selectedDevicePassword.length < 8} />
           </View>
         );
-
       case 'connecting':
         return (
           <View style={styles.loaderCard}>
             <ActivityIndicator size="large" color={colors.accent} />
             <Text style={styles.loadingText}>Connecting to device...</Text>
-            <Text style={styles.loadingSubtext}>
-              Please wait while we connect to your device.
-            </Text>
+            <Text style={styles.loadingSubtext}>Please wait while we connect to your device.</Text>
           </View>
         );
-
       case 'provisioning':
         return (
           <View style={styles.loaderCard}>
             <ActivityIndicator size="large" color={colors.accent} />
             <Text style={styles.loadingText}>Setting up your device</Text>
-            <Text style={styles.loadingSubtext}>
-              This may take a moment. Keep your phone close to the device.
-            </Text>
+            <Text style={styles.loadingSubtext}>This may take a moment. Keep your phone close to the device.</Text>
           </View>
         );
-
       case 'select_wifi':
         return (
           <View style={styles.sheetContent}>
-            <Text style={styles.modalHeaderText}>
-              Select WiFi network for your device
-            </Text>
+            <Text style={styles.modalHeaderText}>Select WiFi network for your device</Text>
             <FlatList
               data={wifiList}
               showsVerticalScrollIndicator={false}
@@ -624,16 +400,12 @@ const AddDevice = () => {
             />
           </View>
         );
-
       default:
         return null;
     }
   };
 
-  const isSmallModal =
-    setupStep === 'device_password' ||
-    setupStep === 'connecting' ||
-    setupStep === 'provisioning';
+  const isSmallModal = setupStep === 'device_password' || setupStep === 'connecting' || setupStep === 'provisioning';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -641,34 +413,21 @@ const AddDevice = () => {
         <BackButtonHeader />
         <Text style={styles.headerText}>Add Device</Text>
         <Gap type="l" />
-        <Text style={styles.subText}>
-          Setting up {routeParams.deviceSSID}
-        </Text>
+        <Text style={styles.subText}>Setting up {route.params.deviceSSID}</Text>
       </View>
 
       <Modal
         animationType="fade"
         transparent
         visible={modalVisible}
-        onRequestClose={() => {
-          if (setupStep === 'device_password') {
-            navigation.goBack();
-          }
-        }}
+        onRequestClose={() => { if (setupStep === 'device_password') { navigation.goBack(); } }}
       >
         <Pressable
-          style={[
-            styles.modalBackdrop,
-            isSmallModal && styles.modalBackdropCentered,
-          ]}
-          onPress={() => {
-            if (setupStep === 'device_password') {
-              navigation.goBack();
-            }
-          }}
+          style={[styles.modalBackdrop, isSmallModal && styles.modalBackdropCentered]}
+          onPress={() => { if (setupStep === 'device_password') { navigation.goBack(); } }}
         >
           {isSmallModal ? (
-            <Pressable style={styles.smallModalWrap} onPress={() => { }}>
+            <Pressable style={styles.smallModalWrap} onPress={() => {}}>
               {renderModalContent()}
             </Pressable>
           ) : (
@@ -679,9 +438,10 @@ const AddDevice = () => {
           )}
         </Pressable>
       </Modal>
+
       <AreaSelectionModal
         visible={setupStep === 'area_selection'}
-        onClose={handleAreaClose}
+        onClose={() => navigation.goBack()}
         onConfirm={handleAreaConfirm}
       />
 
@@ -693,112 +453,24 @@ const AddDevice = () => {
 export default AddDevice;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgPrimary,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  headerText: {
-    fontSize: 24,
-    color: colors.textPrimary,
-  },
-  subText: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-  },
-  flatListContent: {
-    paddingBottom: 20,
-  },
-  deviceText: {
-    ...textFont.regularS,
-    color: colors.textPrimary,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalBackdropCentered: {
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  smallModalWrap: {
-    width: '100%',
-    maxWidth: 360,
-    alignSelf: 'center',
-  },
-  smallModalCard: {
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-  },
-  smallModalTitle: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-  },
-  smallModalSubtitle: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    marginTop: 6,
-  },
-  loaderCard: {
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 16,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-  },
-  loadingText: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  loadingSubtext: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  bottomSheetWrap: {
-    backgroundColor: colors.bgSecondary,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '75%',
-    paddingBottom: 24,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.lineGrey,
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 8,
-  },
-  sheetContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    maxHeight: 520,
-  },
-  modalHeaderText: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-    marginBottom: 16,
-  },
-  modalDeviceItem: {
-    backgroundColor: colors.bgPrimary,
-    padding: 12,
-    borderRadius: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
+  container: { flex: 1, backgroundColor: colors.bgPrimary },
+  content: { flex: 1, padding: 16 },
+  headerText: { fontSize: 24, color: colors.textPrimary },
+  subText: { ...textFont.regularM, color: colors.textSecondary },
+  flatListContent: { paddingBottom: 20 },
+  deviceText: { ...textFont.regularS, color: colors.textPrimary },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalBackdropCentered: { justifyContent: 'center', paddingHorizontal: 24 },
+  smallModalWrap: { width: '100%', maxWidth: 360, alignSelf: 'center' },
+  smallModalCard: { backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.inputBorder },
+  smallModalTitle: { ...textFont.boldL, color: colors.textPrimary },
+  smallModalSubtitle: { ...textFont.regularS, color: colors.textSecondary, marginTop: 6 },
+  loaderCard: { backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: colors.inputBorder },
+  loadingText: { ...textFont.boldL, color: colors.textPrimary, marginTop: 16, textAlign: 'center' },
+  loadingSubtext: { ...textFont.regularS, color: colors.textSecondary, marginTop: 8, textAlign: 'center' },
+  bottomSheetWrap: { backgroundColor: colors.bgSecondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingBottom: 24 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.lineGrey, alignSelf: 'center', marginTop: 10, marginBottom: 8 },
+  sheetContent: { paddingHorizontal: 16, paddingTop: 8, maxHeight: 520 },
+  modalHeaderText: { ...textFont.boldL, color: colors.textPrimary, marginBottom: 16 },
+  modalDeviceItem: { backgroundColor: colors.bgPrimary, padding: 12, borderRadius: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
 });

@@ -2,9 +2,10 @@ import axios from 'axios';
 import { Alert } from 'react-native';
 import { signOut } from '../utils/authSession';
 import { resetToLogin } from '../utils/NavigationService';
+import { API_BASE_URL } from '../constants/appConfig';
 
 const instance = axios.create({
-  baseURL: 'http://64.227.160.209:9090',
+  baseURL: API_BASE_URL,
 });
 
 instance.interceptors.response.use(

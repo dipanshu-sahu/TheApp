@@ -1,6 +1,9 @@
 import React from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { SvgProps } from 'react-native-svg';
+import { iconNames, IconName } from '../types/icons';
+
+export { iconNames, IconName };
 
 import SearchIcon from '../../assets/icons/search.svg';
 import LandIcon from '../../assets/icons/land.svg';
@@ -44,51 +47,6 @@ import SettingsIcon from '../../assets/icons/settings.svg';
 import DevicesIcon from '../../assets/icons/devices.svg';
 import WeatherCardBgIcon from '../../assets/icons/weather-card-bg.svg';
 
-export const iconNames = [
-  'search',
-  'land',
-  'more',
-  'favourite',
-  'store',
-  'arrow-right',
-  'arrow-next',
-  'arrow-back',
-  'close',
-  'password-lock',
-  'heart',
-  'map',
-  'list',
-  'filter',
-  'add-circle',
-  'mail',
-  'eye-close',
-  'eye-open',
-  'home',
-  'profile',
-  'power-button',
-  'arrow-down',
-  'intro-rings',
-  'intro-house',
-  'intro-lightbulb',
-  'intro-ac',
-  'intro-camera',
-  'button-gradient',
-  'phone',
-  'check-circle',
-  'button-gradient-green',
-  'key',
-  'mail-otp',
-  'lock-key',
-  'check',
-  'location-pin',
-  'partly-cloudy',
-  'plug',
-  'settings',
-  'devices',
-  'weather-card-bg',
-] as const;
-
-export type IconName = (typeof iconNames)[number];
 
 const iconMap: Record<IconName, React.FC<SvgProps>> = {
   search: SearchIcon,

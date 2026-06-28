@@ -22,21 +22,9 @@ import HomeHeader from '../components/home/HomeHeader';
 import WeatherWidget from '../components/home/WeatherWidget';
 import SiteDropdown from '../components/site/SiteDropdown';
 import CreateSiteModal from '../components/site/CreateSiteModal';
-// import QuickActionCard from '../components/home/QuickActionCard';
-// import CategorySection from '../components/home/CategorySection';
-// import HomeDeviceCard from '../components/home/HomeDeviceCard';
 import ConnectedSmartSwitchCard from '../components/home/ConnectedSmartSwitchCard';
 import { isDeviceOnline } from '../utils/deviceDisplay';
 import { filterSmartSwitchDevices } from '../utils/deviceMapper';
-// import { mergeWithMockHomeDevices } from '../mocks/homeDevices';
-// import {
-//   getDeviceIcon,
-//   getDeviceStatusLabel,
-//   getSwitchGangCount,
-//   groupDevicesByHomeSection,
-//   HOME_DEVICE_SECTIONS,
-//   HomeDeviceSection,
-// } from '../utils/deviceDisplay';
 
 type HomeStackParamList = {
   Device: { deviceId: string };
@@ -57,16 +45,12 @@ const getGreeting = () => {
 };
 
 const Home: React.FC = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const dispatch = useDispatch<AppDispatch>();
   const { user, fetchUserApi } = useSelector((state: RootState) => state.user);
-  const {
-    devices: apiDevices,
-    isLoading: devicesLoading,
-    error: devicesError,
-  } = useSelector((state: RootState) => state.devices);
-
+  const { devices: apiDevices, isLoading: devicesLoading, error: devicesError } = useSelector(
+    (state: RootState) => state.devices,
+  );
   const { selectedSite } = useSelector((state: RootState) => state.site);
 
   const [showCreateSite, setShowCreateSite] = useState(false);
@@ -76,18 +60,17 @@ const Home: React.FC = () => {
     [apiDevices],
   );
 
-  const currentUser = Array.isArray(user) ? user[0] : user;
-  const firstName = currentUser?.firstName || '';
+  const firstName = user?.firstName || '';
   const homeTitle = `${firstName}'s Home`;
   const avatarLabel = firstName.charAt(0).toUpperCase();
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!user) {
       dispatch(fetchUsers());
-    } else if (currentUser.id) {
-      dispatch(fetchSitesByUser(currentUser.id));
+    } else if (user.id) {
+      dispatch(fetchSitesByUser(user.id));
     }
-  }, [dispatch, currentUser]);
+  }, [dispatch, user]);
 
   useEffect(() => {
     if (selectedSite?.siteId) {
@@ -122,21 +105,12 @@ const Home: React.FC = () => {
           greeting={getGreeting()}
           homeTitle={homeTitle}
           avatarLabel={avatarLabel}
-          onProfilePress={() =>
-            navigation.getParent()?.navigate('Profile' as never)
-          }
+          onProfilePress={() => navigation.getParent()?.navigate('Profile' as never)}
         />
 
         <SiteDropdown onAddSite={() => setShowCreateSite(true)} />
 
         <WeatherWidget />
-
-        {/* <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <QuickActionCard
-          onPress={() => navigation.navigate('ScanDevice')}
-        />
-
-        <CategorySection /> */}
 
         <View style={styles.devicesHeader}>
           <Text style={styles.sectionTitle}>My Devices</Text>
@@ -154,9 +128,7 @@ const Home: React.FC = () => {
         ) : null}
 
         {!devicesLoading && !selectedSite ? (
-          <Text style={styles.emptyText}>
-            Select a site above to see your devices.
-          </Text>
+          <Text style={styles.emptyText}>Select a site above to see your devices.</Text>
         ) : null}
 
         {!devicesLoading && selectedSite && !smartSwitches.length ? (
@@ -167,23 +139,16 @@ const Home: React.FC = () => {
 
         {smartSwitches.length > 0 ? (
           <View style={styles.deviceSection}>
-            <Text style={styles.deviceSectionTitle}>
-              {SMART_SWITCH_SECTION_TITLE}
-            </Text>
-
+            <Text style={styles.deviceSectionTitle}>{SMART_SWITCH_SECTION_TITLE}</Text>
             {smartSwitches.map(device => (
               <ConnectedSmartSwitchCard
                 key={device.id}
                 device={device}
-                onPress={() =>
-                  navigation.navigate('Device', { deviceId: device.id })
-                }
+                onPress={() => navigation.navigate('Device', { deviceId: device.id })}
               />
             ))}
           </View>
         ) : null}
-
-        {/* {HOME_DEVICE_SECTIONS.map(({ id }) => renderSection(id))} */}
       </ScrollView>
     </SafeAreaView>
   );

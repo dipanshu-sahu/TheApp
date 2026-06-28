@@ -22,6 +22,7 @@ import { userLogin } from '../slices/userSlice';
 import { AppDispatch } from '../store/store';
 import { userLoginRequest } from '../types/user';
 import { validateField, isFieldValid } from '../utils/validators';
+import { extractErrorMessage } from '../utils/extractErrorMessage';
 
 const Login = () => {
   const navigation = useNavigation();
@@ -52,21 +53,6 @@ const Login = () => {
     return !validationErrors.email && !validationErrors.password;
   };
 
-  const extractErrorMessage = (error: unknown) => {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'response' in error &&
-      typeof (error as any).response?.data?.message === 'string'
-    ) {
-      return (error as any).response.data.message;
-    }
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return 'Unable to login. Please try again.';
-  };
-
   const handleLogin = async () => {
     if (isSubmitting) {
       return;
@@ -87,7 +73,7 @@ const Login = () => {
       await dispatch(userLogin(data)).unwrap();
       navigation.navigate('App' as never);
     } catch (error) {
-      setFormError(extractErrorMessage(error));
+      setFormError(extractErrorMessage(error, 'Unable to login. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }

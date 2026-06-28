@@ -1,32 +1,31 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, View, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useDispatch, useSelector } from 'react-redux';
+
 import { colors } from '../themes/colors';
-import { Text, View } from 'react-native';
-import BackButtonHeader from '../components/BackButtonHeader';
 import { textFont } from '../utils/textFont';
 import Gap from '../components/Gap';
 import CustomInput from '../components/CustomInput';
 import ActionButton from '../components/ActionButton';
-import { useDispatch, useSelector } from 'react-redux';
+import BackButtonHeader from '../components/BackButtonHeader';
 import { AppDispatch, RootState } from '../store/store';
 import { fetchUsers, updateUserProfile } from '../slices/userSlice';
 import { userUpdateProfileRequest } from '../types/user';
 import { isFieldValid, validateField } from '../utils/validators';
-import { useNavigation } from '@react-navigation/native';
+import { extractErrorMessage } from '../utils/extractErrorMessage';
 
 const ProfileUpdate = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation();
-  const { user, fetchUserApi, updateProfileApi } = useSelector(
-    (state: RootState) => state.user,
-  );
-  const currentUser = useMemo(() => user, [user]);
+  const { user, updateProfileApi } = useSelector((state: RootState) => state.user);
 
   const [formValues, setFormValues] = useState({
-    firstName: currentUser?.firstName ?? '',
-    lastName: currentUser?.lastName ?? '',
-    phoneNumber: currentUser?.phoneNumber ?? '',
-    type: currentUser?.userType ?? '',
+    firstName: user?.firstName ?? '',
+    lastName: user?.lastName ?? '',
+    phoneNumber: user?.phoneNumber ?? '',
+    type: user?.userType ?? '',
   });
   const [errors, setErrors] = useState({
     firstName: '',
@@ -45,12 +44,12 @@ const ProfileUpdate = () => {
 
   useEffect(() => {
     setFormValues({
-      firstName: currentUser?.firstName ?? '',
-      lastName: currentUser?.lastName ?? '',
-      phoneNumber: currentUser?.phoneNumber ?? '',
-      type: currentUser?.userType ?? '',
+      firstName: user?.firstName ?? '',
+      lastName: user?.lastName ?? '',
+      phoneNumber: user?.phoneNumber ?? '',
+      type: user?.userType ?? '',
     });
-  }, [currentUser]);
+  }, [user]);
 
   const handleChange = (field: keyof typeof formValues, value: string) => {
     setFormValues(prev => ({ ...prev, [field]: value }));
@@ -73,28 +72,12 @@ const ProfileUpdate = () => {
     return Object.values(validationErrors).every(message => !message);
   };
 
-  const extractErrorMessage = (err: unknown) => {
-    if (
-      typeof err === 'object' &&
-      err !== null &&
-      'response' in err &&
-      typeof (err as any).response?.data?.message === 'string'
-    ) {
-      return (err as any).response.data.message;
-    }
-    if (err instanceof Error) {
-      return err.message;
-    }
-    return 'Unable to update profile. Please try again.';
-  };
-
   const handleSubmit = async () => {
-    if (isSubmitting || !currentUser?.id) {
+    if (isSubmitting || !user?.id) {
       return;
     }
     setFormError('');
-    const isValid = validateForm();
-    if (!isValid) {
+    if (!validateForm()) {
       return;
     }
 
@@ -107,38 +90,29 @@ const ProfileUpdate = () => {
 
     setIsSubmitting(true);
     try {
-      await dispatch(
-        updateUserProfile({ userId: currentUser.id, payload }),
-      ).unwrap();
+      await dispatch(updateUserProfile({ userId: user.id, payload })).unwrap();
       navigation.goBack();
     } catch (err) {
-      setFormError(extractErrorMessage(err));
+      setFormError(extractErrorMessage(err, 'Unable to update profile. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isSubmitEnabled = () => {
-    return (
-      !!formValues.firstName.trim() &&
-      !!formValues.lastName.trim() &&
-      !!formValues.phoneNumber.trim() &&
-      !!formValues.type.trim() &&
-      !isSubmitting
-    );
-  };
+  const isSubmitEnabled =
+    !!formValues.firstName.trim() &&
+    !!formValues.lastName.trim() &&
+    !!formValues.phoneNumber.trim() &&
+    !!formValues.type.trim() &&
+    !isSubmitting;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgPrimary }}>
-      <View style={{ flex: 1, padding: 16 }}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.body}>
         <BackButtonHeader />
-        <Text style={{ ...textFont.boldXL, color: colors.textPrimary }}>
-          Update Profile
-        </Text>
+        <Text style={styles.title}>Update Profile</Text>
         <Gap type="s" />
-        <Text style={{ ...textFont.regularM, color: colors.textSecondary }}>
-          Modify your personal information below.
-        </Text>
+        <Text style={styles.subtitle}>Modify your personal information below.</Text>
         <Gap type="l" />
         <CustomInput
           icon="profile"
@@ -179,24 +153,48 @@ const ProfileUpdate = () => {
           errorMessage={errors.type}
         />
       </View>
-      <View style={{ padding: 16 }}>
+
+      <View style={styles.footer}>
         {formError || updateProfileApi.error ? (
           <>
-            <Text style={{ ...textFont.regularS, color: colors.error }}>
-              {formError || updateProfileApi.error}
-            </Text>
+            <Text style={styles.formError}>{formError || updateProfileApi.error}</Text>
             <Gap type="s" />
           </>
         ) : null}
         <ActionButton
           title={isSubmitting ? 'Updating...' : 'Update Profile'}
           onPress={handleSubmit}
-          isDisable={!isSubmitEnabled()}
+          isDisable={!isSubmitEnabled}
         />
       </View>
     </SafeAreaView>
   );
 };
 
-export default ProfileUpdate;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgPrimary,
+  },
+  body: {
+    flex: 1,
+    padding: 16,
+  },
+  title: {
+    ...textFont.boldXL,
+    color: colors.textPrimary,
+  },
+  subtitle: {
+    ...textFont.regularM,
+    color: colors.textSecondary,
+  },
+  footer: {
+    padding: 16,
+  },
+  formError: {
+    ...textFont.regularS,
+    color: colors.error,
+  },
+});
 
+export default ProfileUpdate;

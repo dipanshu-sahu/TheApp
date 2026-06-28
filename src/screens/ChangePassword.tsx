@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../themes/colors';
-import { Text, View } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
-import BackButtonHeader from '../components/BackButtonHeader';
+import { colors } from '../themes/colors';
 import { textFont } from '../utils/textFont';
 import Gap from '../components/Gap';
 import CustomInput from '../components/CustomInput';
 import ActionButton from '../components/ActionButton';
+import BackButtonHeader from '../components/BackButtonHeader';
 import { validateField, isFieldValid } from '../utils/validators';
+import { extractErrorMessage } from '../utils/extractErrorMessage';
 import { userChangePasswordApi } from '../apis/userAPI';
 import { userChangePasswordRequest } from '../types/user';
 
@@ -24,9 +25,7 @@ const initialValues: Record<FormField, string> = {
 const ChangePassword = () => {
   const navigation = useNavigation();
 
-  const [formValues, setFormValues] = useState<Record<FormField, string>>(
-    initialValues,
-  );
+  const [formValues, setFormValues] = useState<Record<FormField, string>>(initialValues);
   const [errors, setErrors] = useState<Record<FormField, string>>({
     currentPassword: '',
     newPassword: '',
@@ -49,29 +48,12 @@ const ChangePassword = () => {
     const validationErrors: Record<FormField, string> = {
       currentPassword: validateField('currentPassword', formValues.currentPassword),
       newPassword: validateField('newPassword', formValues.newPassword),
-      confirmPassword: validateField(
-        'confirmPassword',
-        formValues.confirmPassword,
-        { password: formValues.newPassword },
-      ),
+      confirmPassword: validateField('confirmPassword', formValues.confirmPassword, {
+        password: formValues.newPassword,
+      }),
     };
     setErrors(validationErrors);
     return Object.values(validationErrors).every(message => !message);
-  };
-
-  const extractErrorMessage = (error: unknown) => {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'response' in error &&
-      typeof (error as any).response?.data?.message === 'string'
-    ) {
-      return (error as any).response.data.message;
-    }
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return 'Unable to change password. Please try again.';
   };
 
   const handleSubmit = async () => {
@@ -80,8 +62,7 @@ const ChangePassword = () => {
     }
 
     setFormError('');
-    const isValid = validateForm();
-    if (!isValid) {
+    if (!validateForm()) {
       return;
     }
 
@@ -96,36 +77,27 @@ const ChangePassword = () => {
       await userChangePasswordApi(payload);
       navigation.goBack();
     } catch (error) {
-      setFormError(extractErrorMessage(error));
+      setFormError(extractErrorMessage(error, 'Unable to change password. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isSubmitEnabled = () => {
-    return (
-      isFieldValid('currentPassword', formValues.currentPassword) &&
-      isFieldValid('newPassword', formValues.newPassword) &&
-      isFieldValid(
-        'confirmPassword',
-        formValues.confirmPassword,
-        { password: formValues.newPassword },
-      ) &&
-      !isSubmitting
-    );
-  };
+  const isSubmitEnabled =
+    isFieldValid('currentPassword', formValues.currentPassword) &&
+    isFieldValid('newPassword', formValues.newPassword) &&
+    isFieldValid('confirmPassword', formValues.confirmPassword, {
+      password: formValues.newPassword,
+    }) &&
+    !isSubmitting;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgPrimary }}>
-      <View style={{ flex: 1, padding: 16 }}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.body}>
         <BackButtonHeader />
-        <Text style={{ ...textFont.boldXL, color: colors.textPrimary }}>
-          Change Password
-        </Text>
+        <Text style={styles.title}>Change Password</Text>
         <Gap type="s" />
-        <Text style={{ ...textFont.regularM, color: colors.textSecondary }}>
-          Enter your current password and set a new one.
-        </Text>
+        <Text style={styles.subtitle}>Enter your current password and set a new one.</Text>
         <Gap type="l" />
         <CustomInput
           icon="password-lock"
@@ -157,24 +129,48 @@ const ChangePassword = () => {
           errorMessage={errors.confirmPassword}
         />
       </View>
-      <View style={{ padding: 16 }}>
+
+      <View style={styles.footer}>
         {formError ? (
           <>
-            <Text style={{ ...textFont.regularS, color: colors.error }}>
-              {formError}
-            </Text>
+            <Text style={styles.formError}>{formError}</Text>
             <Gap type="s" />
           </>
         ) : null}
         <ActionButton
           title="Update Password"
           onPress={handleSubmit}
-          isDisable={!isSubmitEnabled()}
+          isDisable={!isSubmitEnabled}
         />
       </View>
     </SafeAreaView>
   );
 };
 
-export default ChangePassword;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgPrimary,
+  },
+  body: {
+    flex: 1,
+    padding: 16,
+  },
+  title: {
+    ...textFont.boldXL,
+    color: colors.textPrimary,
+  },
+  subtitle: {
+    ...textFont.regularM,
+    color: colors.textSecondary,
+  },
+  footer: {
+    padding: 16,
+  },
+  formError: {
+    ...textFont.regularS,
+    color: colors.error,
+  },
+});
 
+export default ChangePassword;

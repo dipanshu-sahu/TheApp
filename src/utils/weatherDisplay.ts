@@ -1,4 +1,4 @@
-import { IconName } from '../components/Icon';
+import { IconName } from '../types/icons';
 
 export const getWeatherConditionLabel = (weatherCode: number): string => {
   switch (weatherCode) {
