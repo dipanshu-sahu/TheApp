@@ -1,15 +1,20 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Icon, { IconName } from '../Icon';
 import ToggleSwitch from './ToggleSwitch';
-import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import AppText from '../ui/AppText';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import { colors, withAlpha } from '../../themes/colors';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
+import { shadows } from '../../themes/shadows';
 
 type HomeDeviceCardProps = {
   name: string;
   statusLabel: string;
   icon: IconName;
   isOn: boolean;
+  accent?: string;
   onToggle: (value: boolean) => void;
   onPress: () => void;
 };
@@ -19,58 +24,70 @@ const HomeDeviceCard: React.FC<HomeDeviceCardProps> = ({
   statusLabel,
   icon,
   isOn,
+  accent = colors.primary,
   onToggle,
   onPress,
 }) => (
-  <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
+  <AnimatedPressable
+    style={[styles.card, shadows.sm]}
+    onPress={onPress}
+    pressScale={0.97}
+    enforceTouchTarget={false}
+  >
     <View style={styles.topRow}>
-      <View style={styles.iconBox}>
-        <Icon name={icon} width={20} height={20} color={colors.accent} />
+      <View style={[styles.iconBox, { backgroundColor: isOn ? withAlpha(accent, 0.18) : colors.surfaceSubtle }]}>
+        <Icon name={icon} width={22} height={22} color={isOn ? accent : colors.textSecondary} />
       </View>
       <ToggleSwitch value={isOn} onValueChange={onToggle} />
     </View>
-    <Text style={styles.name} numberOfLines={1}>
+
+    <AppText variant="bodyLgStrong" numberOfLines={1} style={styles.name}>
       {name}
-    </Text>
-    <Text style={[styles.status, isOn && styles.statusOn]}>{statusLabel}</Text>
-  </TouchableOpacity>
+    </AppText>
+
+    <View style={styles.statusRow}>
+      <View style={[styles.statusDot, { backgroundColor: isOn ? colors.success : colors.textTertiary }]} />
+      <AppText variant="caption" color={isOn ? colors.textSecondary : colors.textTertiary} numberOfLines={1}>
+        {statusLabel}
+      </AppText>
+    </View>
+  </AnimatedPressable>
 );
 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    padding: 14,
-    minHeight: 120,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    minHeight: 132,
+    justifyContent: 'space-between',
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: `${colors.accent}22`,
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   name: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: spacing.xxs,
   },
-  status: {
-    ...textFont.regularS,
-    color: colors.textGrey,
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  statusOn: {
-    color: colors.accent,
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
 });
 

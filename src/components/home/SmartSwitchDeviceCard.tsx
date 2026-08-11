@@ -1,14 +1,19 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  interpolateColor,
+} from 'react-native-reanimated';
 import Icon from '../Icon';
-import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import AppText from '../ui/AppText';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import { colors, withAlpha } from '../../themes/colors';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
+import { shadows } from '../../themes/shadows';
+import { durations, easings } from '../../themes/motion';
 import { SWITCH_GANG_COLORS } from '../../utils/deviceDisplay';
 
 type SmartSwitchDeviceCardProps = {
@@ -21,6 +26,30 @@ type SmartSwitchDeviceCardProps = {
   onPress: () => void;
 };
 
+const PowerButton: React.FC<{ isOn: boolean; disabled?: boolean; onPress: () => void }> = ({
+  isOn,
+  disabled,
+  onPress,
+}) => {
+  const progress = useSharedValue(isOn ? 1 : 0);
+
+  useEffect(() => {
+    progress.value = withTiming(isOn ? 1 : 0, { duration: durations.base, easing: easings.standard });
+  }, [isOn, progress]);
+
+  const style = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(progress.value, [0, 1], [colors.surfaceSubtle, colors.secondary]),
+  }));
+
+  return (
+    <AnimatedPressable onPress={onPress} disabled={disabled} pressScale={0.92}>
+      <Animated.View style={[styles.mainPowerBtn, isOn ? shadows.glow : shadows.none, style]}>
+        <Icon name="power-button" width={20} height={20} color={isOn ? colors.white : colors.textSecondary} />
+      </Animated.View>
+    </AnimatedPressable>
+  );
+};
+
 const SmartSwitchDeviceCard: React.FC<SmartSwitchDeviceCardProps> = ({
   name,
   isOn,
@@ -30,79 +59,70 @@ const SmartSwitchDeviceCard: React.FC<SmartSwitchDeviceCardProps> = ({
   onGangToggle,
   onPress,
 }) => (
-  <TouchableOpacity
-    style={[styles.card, disabled && styles.cardDisabled]}
+  <AnimatedPressable
+    style={[styles.card, shadows.sm, disabled && styles.cardDisabled]}
     onPress={onPress}
-    activeOpacity={0.92}
+    pressScale={0.99}
+    enforceTouchTarget={false}
   >
     <View style={styles.header}>
-      <View style={styles.deviceIconBox}>
-        <Icon name="power-button" width={18} height={18} fill={colors.textPrimary} />
+      <View style={[styles.deviceIconBox, isOn && styles.deviceIconBoxOn]}>
+        <Icon name="switch" width={20} height={20} color={isOn ? colors.secondary : colors.textSecondary} />
       </View>
-      <Text style={styles.name} numberOfLines={1}>
-        {name}
-      </Text>
-      <TouchableOpacity
-        style={[styles.mainPowerBtn, isOn && styles.mainPowerBtnOn]}
-        onPress={() => !disabled && onMainToggle(!isOn)}
-        activeOpacity={0.85}
-        hitSlop={8}
-        disabled={disabled}
-      >
-        <Icon
-          name="power-button"
-          width={20}
-          height={20}
-          fill={colors.textPrimary}
-        />
-      </TouchableOpacity>
+      <View style={styles.headerText}>
+        <AppText variant="title" numberOfLines={1}>
+          {name}
+        </AppText>
+        <AppText variant="caption" color={isOn ? colors.secondary : colors.textTertiary}>
+          {isOn ? 'Active' : 'Standby'}
+        </AppText>
+      </View>
+      <PowerButton isOn={isOn} disabled={disabled} onPress={() => !disabled && onMainToggle(!isOn)} />
     </View>
 
     <View style={styles.gangRow}>
       {gangStates.map((gangOn, index) => {
         const gangColor = SWITCH_GANG_COLORS[index % SWITCH_GANG_COLORS.length];
         return (
-          <TouchableOpacity
+          <AnimatedPressable
             key={`gang-${index}`}
             style={styles.gangCol}
             onPress={() => !disabled && onGangToggle(index, !gangOn)}
-            activeOpacity={0.85}
             disabled={disabled}
+            pressScale={0.95}
+            enforceTouchTarget={false}
           >
-            <Icon
-              name="power-button"
-              width={18}
-              height={18}
-              fill={gangColor}
-            />
-            <Text style={styles.gangLabel}>Switch {index + 1}</Text>
-            <Text style={[styles.gangStatus, gangOn && styles.gangStatusOn]}>
+            <View
+              style={[
+                styles.gangIcon,
+                { backgroundColor: gangOn ? withAlpha(gangColor, 0.16) : colors.surfaceSubtle },
+              ]}
+            >
+              <Icon name="power-button" width={18} height={18} color={gangOn ? gangColor : colors.textTertiary} />
+            </View>
+            <AppText variant="caption" color={colors.textSecondary} align="center" numberOfLines={1}>
+              Switch {index + 1}
+            </AppText>
+            <AppText
+              variant="micro"
+              color={gangOn ? gangColor : colors.textTertiary}
+              align="center"
+            >
               {gangOn ? 'ON' : 'OFF'}
-            </Text>
-          </TouchableOpacity>
+            </AppText>
+          </AnimatedPressable>
         );
       })}
     </View>
-  </TouchableOpacity>
+  </AnimatedPressable>
 );
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    padding: 16,
-    marginBottom: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: { elevation: 4 },
-    }),
+    backgroundColor: colors.surfaceCard,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
   },
   cardDisabled: {
     opacity: 0.7,
@@ -110,65 +130,47 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 10,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
   },
   deviceIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.bgSecondary,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
+    width: 42,
+    height: 42,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceSubtle,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  name: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
+  deviceIconBoxOn: {
+    backgroundColor: colors.secondarySoft,
+  },
+  headerText: {
     flex: 1,
   },
   mainPowerBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.switchTrackOff,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-      },
-      android: { elevation: 3 },
-    }),
-  },
-  mainPowerBtnOn: {
-    backgroundColor: colors.signupGreen,
   },
   gangRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: spacing.xs,
   },
   gangCol: {
     flex: 1,
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.xxs,
   },
-  gangLabel: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  gangStatus: {
-    ...textFont.boldS,
-    color: colors.textGrey,
-    textAlign: 'center',
-  },
-  gangStatusOn: {
-    color: colors.link,
+  gangIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xxs,
   },
 });
 

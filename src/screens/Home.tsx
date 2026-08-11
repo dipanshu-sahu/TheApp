@@ -1,18 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Text,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
+import Animated from 'react-native-reanimated';
 
-import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
+import Screen from '../components/ui/Screen';
+import AppText from '../components/ui/AppText';
+import GlassCard from '../components/ui/GlassCard';
+import AnimatedPressable from '../components/ui/AnimatedPressable';
+import Icon from '../components/Icon';
+import { IconName } from '../types/icons';
+import { enterFade, enterUp, layoutSpring } from '../components/ui/motion';
+import { colors, withAlpha } from '../themes/colors';
+import { radii } from '../themes/radii';
+import { spacing } from '../themes/spacing';
 import { fetchUsers } from '../slices/userSlice';
 import { AppDispatch, RootState } from '../store/store';
 import { fetchDevicesBySite } from '../slices/deviceSlice';
@@ -25,27 +27,61 @@ import CreateSiteModal from '../components/site/CreateSiteModal';
 import ConnectedSmartSwitchCard from '../components/home/ConnectedSmartSwitchCard';
 import { isDeviceOnline } from '../utils/deviceDisplay';
 import { filterSmartSwitchDevices } from '../utils/deviceMapper';
-
-type HomeStackParamList = {
-  Device: { deviceId: string };
-  ScanDevice: undefined;
-};
-
-const SMART_SWITCH_SECTION_TITLE = 'Smart Switch';
+import { MyHomeStackParamList } from '../navigation';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
   if (hour < 12) {
-    return 'Good Morning ☀️';
+    return 'Good Morning';
   }
   if (hour < 17) {
-    return 'Good Afternoon ☀️';
+    return 'Good Afternoon';
   }
-  return 'Good Evening 🌙';
+  return 'Good Evening';
 };
 
+type TileProps = {
+  value: string;
+  label: string;
+  icon: IconName;
+  accent: string;
+  wide?: boolean;
+};
+
+const BentoTile: React.FC<TileProps> = ({ value, label, icon, accent, wide }) => (
+  <GlassCard variant="soft" sheen={false} style={[styles.tile, wide ? styles.tileWide : styles.tileHalf]}>
+    <View style={[styles.tileIcon, { backgroundColor: withAlpha(accent, 0.16) }]}>
+      <Icon name={icon} width={20} height={20} color={accent} />
+    </View>
+    <AppText variant="displaySm" color={accent} style={styles.tileValue}>
+      {value}
+    </AppText>
+    <AppText variant="caption" color={colors.textSecondary}>
+      {label}
+    </AppText>
+  </GlassCard>
+);
+
+const QuickTile: React.FC<{
+  icon: IconName;
+  label: string;
+  accent: string;
+  onPress: () => void;
+}> = ({ icon, label, accent, onPress }) => (
+  <AnimatedPressable onPress={onPress} pressScale={0.97} enforceTouchTarget={false} style={styles.quickWrap}>
+    <GlassCard variant="soft" sheen={false} style={styles.quickCard}>
+      <View style={[styles.quickIcon, { backgroundColor: withAlpha(accent, 0.18) }]}>
+        <Icon name={icon} width={22} height={22} color={accent} />
+      </View>
+      <AppText variant="captionStrong" numberOfLines={1}>
+        {label}
+      </AppText>
+    </GlassCard>
+  </AnimatedPressable>
+);
+
 const Home: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<MyHomeStackParamList>>();
   const dispatch = useDispatch<AppDispatch>();
   const { user, fetchUserApi } = useSelector((state: RootState) => state.user);
   const { devices: apiDevices, isLoading: devicesLoading, error: devicesError } = useSelector(
@@ -61,8 +97,8 @@ const Home: React.FC = () => {
   );
 
   const firstName = user?.firstName || '';
-  const homeTitle = `${firstName}'s Home`;
-  const avatarLabel = firstName.charAt(0).toUpperCase();
+  const homeTitle = firstName ? `${firstName}'s Home` : 'My Home';
+  const avatarLabel = (firstName.charAt(0) || 'H').toUpperCase();
 
   useEffect(() => {
     if (!user) {
@@ -88,7 +124,7 @@ const Home: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <Screen edges={['top']} scroll contentContainerStyle={styles.scrollContent}>
       <CreateSiteModal
         visible={showCreateSite}
         onClose={() => setShowCreateSite(false)}
@@ -97,109 +133,184 @@ const Home: React.FC = () => {
           setShowCreateSite(false);
         }}
       />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+
+      <Animated.View entering={enterFade(0)}>
         <HomeHeader
           greeting={getGreeting()}
           homeTitle={homeTitle}
           avatarLabel={avatarLabel}
           onProfilePress={() => navigation.getParent()?.navigate('Profile' as never)}
         />
+      </Animated.View>
 
+      <Animated.View entering={enterUp(1)}>
         <SiteDropdown onAddSite={() => setShowCreateSite(true)} />
+      </Animated.View>
 
+      {/* Hero weather — full-bleed bento cell */}
+      <Animated.View entering={enterUp(2)}>
         <WeatherWidget />
+      </Animated.View>
 
-        <View style={styles.devicesHeader}>
-          <Text style={styles.sectionTitle}>My Devices</Text>
-          <Text style={styles.onlineCount}>
-            {devicesLoading ? '...' : `${onlineCount} online`}
-          </Text>
-        </View>
+      {/* Asymmetric stats bento */}
+      <Animated.View entering={enterUp(3)} style={styles.bentoRow}>
+        <BentoTile
+          value={devicesLoading ? '—' : String(onlineCount)}
+          label="Online now"
+          icon="wifi"
+          accent={colors.secondary}
+        />
+        <BentoTile
+          value={devicesLoading ? '—' : String(smartSwitches.length)}
+          label="Total devices"
+          icon="devices"
+          accent={colors.primary}
+        />
+      </Animated.View>
 
-        {devicesLoading || fetchUserApi.loading ? (
-          <ActivityIndicator color={colors.accent} style={styles.loader} />
-        ) : null}
+      {/* Quick actions strip */}
+      <Animated.View entering={enterUp(4)} style={styles.quickRow}>
+        <QuickTile
+          icon="add-circle"
+          label="Add"
+          accent={colors.primary}
+          onPress={() => navigation.navigate('ScanDevice')}
+        />
+        <QuickTile
+          icon="zap"
+          label="Scenes"
+          accent={colors.cta}
+          onPress={() => navigation.getParent()?.navigate('AutoTab' as never)}
+        />
+        <QuickTile
+          icon="grid"
+          label="Devices"
+          accent={colors.gradPrimaryEnd}
+          onPress={() => navigation.getParent()?.navigate('DevicesTab' as never)}
+        />
+        <QuickTile
+          icon="sliders"
+          label="Rooms"
+          accent={colors.secondary}
+          onPress={() => setShowCreateSite(true)}
+        />
+      </Animated.View>
 
-        {devicesError && !apiDevices?.length ? (
-          <Text style={styles.errorText}>{devicesError}</Text>
-        ) : null}
+      <Animated.View entering={enterUp(5)} style={styles.devicesHeader}>
+        <AppText variant="h3">My Devices</AppText>
+        <AppText variant="body" color={colors.textSecondary}>
+          {devicesLoading ? '…' : `${onlineCount} online`}
+        </AppText>
+      </Animated.View>
 
-        {!devicesLoading && !selectedSite ? (
-          <Text style={styles.emptyText}>Select a site above to see your devices.</Text>
-        ) : null}
+      {devicesLoading || fetchUserApi.loading ? (
+        <ActivityIndicator color={colors.primary} style={styles.loader} />
+      ) : null}
 
-        {!devicesLoading && selectedSite && !smartSwitches.length ? (
-          <Text style={styles.emptyText}>
-            No devices found in {selectedSite.location}. Add a device to get started.
-          </Text>
-        ) : null}
+      {devicesError && !apiDevices?.length ? (
+        <AppText variant="body" color={colors.error} style={styles.stateText}>
+          {devicesError}
+        </AppText>
+      ) : null}
 
-        {smartSwitches.length > 0 ? (
-          <View style={styles.deviceSection}>
-            <Text style={styles.deviceSectionTitle}>{SMART_SWITCH_SECTION_TITLE}</Text>
-            {smartSwitches.map(device => (
-              <ConnectedSmartSwitchCard
-                key={device.id}
-                device={device}
-                onPress={() => navigation.navigate('Device', { deviceId: device.id })}
-              />
-            ))}
-          </View>
-        ) : null}
-      </ScrollView>
-    </SafeAreaView>
+      {!devicesLoading && !selectedSite ? (
+        <GlassCard style={styles.emptyCard}>
+          <Icon name="home" width={28} height={28} color={colors.textTertiary} />
+          <AppText variant="bodyLg" color={colors.textSecondary} align="center">
+            Select a site above to see your devices.
+          </AppText>
+        </GlassCard>
+      ) : null}
+
+      {!devicesLoading && selectedSite && !smartSwitches.length ? (
+        <GlassCard style={styles.emptyCard}>
+          <Icon name="plug" width={28} height={28} color={colors.textTertiary} />
+          <AppText variant="bodyLg" color={colors.textSecondary} align="center">
+            No devices in {selectedSite.location}. Tap Add to get started.
+          </AppText>
+        </GlassCard>
+      ) : null}
+
+      {smartSwitches.map((device, index) => (
+        <Animated.View key={device.id} entering={enterUp(index + 6)} layout={layoutSpring}>
+          <ConnectedSmartSwitchCard
+            device={device}
+            onPress={() => navigation.navigate('Device', { deviceId: device.id })}
+          />
+        </Animated.View>
+      ))}
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.homeBg,
-  },
   scrollContent: {
-    paddingHorizontal: 20,
     paddingBottom: 120,
   },
-  sectionTitle: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-    marginBottom: 14,
+  bentoRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  tile: {
+    padding: spacing.md,
+    minHeight: 112,
+  },
+  tileHalf: {
+    flex: 1,
+  },
+  tileWide: {
+    flex: 2,
+  },
+  tileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  tileValue: {
+    marginBottom: 2,
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
+  },
+  quickWrap: {
+    flex: 1,
+  },
+  quickCard: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  quickIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   devicesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
-  },
-  onlineCount: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-  },
-  deviceSection: {
-    marginBottom: 8,
-  },
-  deviceSectionTitle: {
-    ...textFont.boldM,
-    color: colors.textSecondary,
-    marginBottom: 12,
-    letterSpacing: 0.3,
+    marginBottom: spacing.md,
   },
   loader: {
-    marginVertical: 16,
+    marginVertical: spacing.md,
   },
-  errorText: {
-    ...textFont.regularS,
-    color: colors.error,
-    marginBottom: 12,
+  stateText: {
+    marginBottom: spacing.sm,
   },
-  emptyText: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
+  emptyCard: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
 });
 

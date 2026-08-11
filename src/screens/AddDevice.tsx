@@ -2,19 +2,15 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
-  Text,
   FlatList,
-  TouchableOpacity,
   Modal,
   ActivityIndicator,
   Pressable,
-  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeOut, SlideInDown } from 'react-native-reanimated';
 import WifiManager, { WifiEntry } from 'react-native-wifi-reborn';
-import { request, PERMISSIONS } from 'react-native-permissions';
 import uuid from 'react-native-uuid';
-import NetInfo, { NetInfoStateType } from '@react-native-community/netinfo';
+import NetInfo, { NetInfoStateType, NetInfoWifiState } from '@react-native-community/netinfo';
 import ToastManager, { Toast } from 'toastify-react-native';
 import {
   RouteProp,
@@ -25,13 +21,19 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 
+import Screen from '../components/ui/Screen';
+import AppText from '../components/ui/AppText';
+import Button from '../components/ui/Button';
+import TextField from '../components/ui/TextField';
+import AnimatedPressable from '../components/ui/AnimatedPressable';
 import { colors } from '../themes/colors';
+import { radii } from '../themes/radii';
+import { spacing } from '../themes/spacing';
+import { shadows } from '../themes/shadows';
+import { durations, easings } from '../themes/motion';
 import Gap from '../components/Gap';
-import { textFont } from '../utils/textFont';
 import Icon from '../components/Icon';
 import BackButtonHeader from '../components/BackButtonHeader';
-import CustomInput from '../components/CustomInput';
-import ActionButton from '../components/ActionButton';
 import AreaSelectionModal from '../components/scan/AreaSelectionModal';
 import { AppDispatch, RootState } from '../store/store';
 import { addDevice } from '../slices/deviceSlice';
@@ -41,6 +43,7 @@ import {
   runProvisioningProtocol,
   ProvisioningResult,
 } from '../services/provisioningService';
+import { hasLocationPermission } from '../utils/permissions';
 
 type SetupStep = 'area_selection' | 'device_password' | 'connecting' | 'select_wifi' | 'provisioning';
 const MAX_RECONNECT = 3;
@@ -180,7 +183,8 @@ const AddDevice = () => {
         return;
       }
       if (state.type === NetInfoStateType.wifi) {
-        const ssid = (state.details as { ssid?: string | null } | null)?.ssid;
+        const wifiState = state as NetInfoWifiState;
+        const ssid = wifiState.details?.ssid ?? null;
         if (ssid && ssid !== route.params.deviceSSID) {
           attemptReconnect();
         }
@@ -194,17 +198,12 @@ const AddDevice = () => {
   }, [setupStep, route.params?.deviceSSID, goBackToScan]);
 
   useEffect(() => {
-    const permission =
-      Platform.OS === 'ios'
-        ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
-        : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
-    request(permission, {
-      title: 'Location permission is required for WiFi connections',
-      message: 'This app needs location permission to scan for WiFi networks.',
-      buttonNegative: 'DENY',
-      buttonPositive: 'ALLOW',
-    })
-      .then(() => loadHomeWifiList())
+    hasLocationPermission()
+      .then((granted) => {
+        if (granted) {
+          loadHomeWifiList();
+        }
+      })
       .catch(() => {});
   }, [loadHomeWifiList]);
 
@@ -316,38 +315,45 @@ const AddDevice = () => {
   );
 
   const renderModalDeviceItem = useCallback(
-    ({ item }: { item: WifiEntry }) => (
-      <>
-        <TouchableOpacity style={styles.modalDeviceItem} onPress={() => setSelectedWifi(item)}>
-          <Text style={styles.deviceText}>{item.SSID}</Text>
-          <Icon
-            name={selectedWifi?.BSSID === item.BSSID ? 'arrow-down' : 'arrow-next'}
-            width={selectedWifi?.BSSID === item.BSSID ? 14 : 20}
-            height={selectedWifi?.BSSID === item.BSSID ? 14 : 20}
-            fill={colors.greyLight}
-          />
-        </TouchableOpacity>
-        {selectedWifi?.BSSID === item.BSSID ? (
-          <View>
-            <CustomInput
-              icon="password-lock"
-              placeholder="WiFi password"
-              maxLength={30}
-              value={selectedWifiPassword}
-              onChangeText={setSelectedWifiPassword}
-              isPassword
+    ({ item }: { item: WifiEntry }) => {
+      const isSelected = selectedWifi?.BSSID === item.BSSID;
+      return (
+        <>
+          <AnimatedPressable
+            style={[styles.modalDeviceItem, isSelected && styles.modalDeviceItemSelected]}
+            onPress={() => setSelectedWifi(item)}
+            pressScale={0.98}
+            enforceTouchTarget={false}
+          >
+            <AppText variant="bodyLg">{item.SSID}</AppText>
+            <Icon
+              name={isSelected ? 'arrow-down' : 'arrow-next'}
+              width={isSelected ? 14 : 18}
+              height={isSelected ? 14 : 18}
+              fill={colors.textTertiary}
             />
-            <Gap type="m" />
-            <ActionButton
-              title="Start Provisioning"
-              onPress={() => handleInitiateProvisioning(item)}
-              isDisable={selectedWifiPassword.length < 8}
-            />
-            <Gap type="m" />
-          </View>
-        ) : null}
-      </>
-    ),
+          </AnimatedPressable>
+          {isSelected ? (
+            <View style={styles.wifiPasswordBlock}>
+              <TextField
+                icon="password-lock"
+                placeholder="WiFi password"
+                maxLength={30}
+                value={selectedWifiPassword}
+                onChangeText={setSelectedWifiPassword}
+                isPassword
+              />
+              <Button
+                title="Start Provisioning"
+                onPress={() => handleInitiateProvisioning(item)}
+                disabled={selectedWifiPassword.length < 8}
+              />
+              <Gap type="m" />
+            </View>
+          ) : null}
+        </>
+      );
+    },
     [selectedWifi, selectedWifiPassword, handleInitiateProvisioning],
   );
 
@@ -356,10 +362,12 @@ const AddDevice = () => {
       case 'device_password':
         return (
           <View style={styles.smallModalCard}>
-            <Text style={styles.smallModalTitle}>Device Password</Text>
-            <Text style={styles.smallModalSubtitle}>Enter the password for {route.params?.deviceSSID}</Text>
+            <AppText variant="h3">Device Password</AppText>
+            <AppText variant="body" color={colors.textSecondary} style={styles.smallModalSubtitle}>
+              Enter the password for {route.params?.deviceSSID}
+            </AppText>
             <Gap type="m" />
-            <CustomInput
+            <TextField
               icon="password-lock"
               placeholder="Device password"
               maxLength={30}
@@ -367,30 +375,40 @@ const AddDevice = () => {
               onChangeText={setSelectedDevicePassword}
               isPassword
             />
-            <Gap type="l" />
-            <ActionButton title="Connect" onPress={connectToDeviceAp} isDisable={selectedDevicePassword.length < 8} />
+            <Gap type="s" />
+            <Button title="Connect" onPress={connectToDeviceAp} disabled={selectedDevicePassword.length < 8} />
           </View>
         );
       case 'connecting':
         return (
           <View style={styles.loaderCard}>
-            <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={styles.loadingText}>Connecting to device...</Text>
-            <Text style={styles.loadingSubtext}>Please wait while we connect to your device.</Text>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <AppText variant="h3" align="center" style={styles.loadingText}>
+              Connecting to device...
+            </AppText>
+            <AppText variant="body" color={colors.textSecondary} align="center" style={styles.loadingSubtext}>
+              Please wait while we connect to your device.
+            </AppText>
           </View>
         );
       case 'provisioning':
         return (
           <View style={styles.loaderCard}>
-            <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={styles.loadingText}>Setting up your device</Text>
-            <Text style={styles.loadingSubtext}>This may take a moment. Keep your phone close to the device.</Text>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <AppText variant="h3" align="center" style={styles.loadingText}>
+              Setting up your device
+            </AppText>
+            <AppText variant="body" color={colors.textSecondary} align="center" style={styles.loadingSubtext}>
+              This may take a moment. Keep your phone close to the device.
+            </AppText>
           </View>
         );
       case 'select_wifi':
         return (
           <View style={styles.sheetContent}>
-            <Text style={styles.modalHeaderText}>Select WiFi network for your device</Text>
+            <AppText variant="h3" style={styles.modalHeaderText}>
+              Select WiFi network for your device
+            </AppText>
             <FlatList
               data={wifiList}
               showsVerticalScrollIndicator={false}
@@ -408,35 +426,37 @@ const AddDevice = () => {
   const isSmallModal = setupStep === 'device_password' || setupStep === 'connecting' || setupStep === 'provisioning';
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <BackButtonHeader />
-        <Text style={styles.headerText}>Add Device</Text>
-        <Gap type="l" />
-        <Text style={styles.subText}>Setting up {route.params.deviceSSID}</Text>
-      </View>
+    <Screen edges={['top', 'bottom']}>
+      <BackButtonHeader />
+      <AppText variant="h1">Add Device</AppText>
+      <Gap type="l" />
+      <AppText variant="bodyLg" color={colors.textSecondary}>
+        Setting up {route.params.deviceSSID}
+      </AppText>
 
       <Modal
-        animationType="fade"
+        animationType="none"
         transparent
         visible={modalVisible}
         onRequestClose={() => { if (setupStep === 'device_password') { navigation.goBack(); } }}
       >
-        <Pressable
-          style={[styles.modalBackdrop, isSmallModal && styles.modalBackdropCentered]}
-          onPress={() => { if (setupStep === 'device_password') { navigation.goBack(); } }}
-        >
-          {isSmallModal ? (
-            <Pressable style={styles.smallModalWrap} onPress={() => {}}>
-              {renderModalContent()}
-            </Pressable>
-          ) : (
-            <View style={styles.bottomSheetWrap}>
-              <View style={styles.sheetHandle} />
-              {renderModalContent()}
-            </View>
-          )}
-        </Pressable>
+        <Animated.View entering={FadeIn.duration(durations.fast)} exiting={FadeOut.duration(durations.fast)} style={styles.flex}>
+          <Pressable
+            style={[styles.modalBackdrop, isSmallModal && styles.modalBackdropCentered]}
+            onPress={() => { if (setupStep === 'device_password') { navigation.goBack(); } }}
+          >
+            {isSmallModal ? (
+              <Animated.View entering={FadeIn.duration(durations.base).easing(easings.decelerate)} style={styles.smallModalWrap}>
+                <Pressable onPress={() => {}}>{renderModalContent()}</Pressable>
+              </Animated.View>
+            ) : (
+              <Animated.View entering={SlideInDown.duration(durations.base).easing(easings.decelerate)} style={styles.bottomSheetWrap}>
+                <View style={styles.sheetHandle} />
+                {renderModalContent()}
+              </Animated.View>
+            )}
+          </Pressable>
+        </Animated.View>
       </Modal>
 
       <AreaSelectionModal
@@ -446,31 +466,95 @@ const AddDevice = () => {
       />
 
       <ToastManager config={{}} />
-    </SafeAreaView>
+    </Screen>
   );
 };
 
-export default AddDevice;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bgPrimary },
-  content: { flex: 1, padding: 16 },
-  headerText: { fontSize: 24, color: colors.textPrimary },
-  subText: { ...textFont.regularM, color: colors.textSecondary },
-  flatListContent: { paddingBottom: 20 },
-  deviceText: { ...textFont.regularS, color: colors.textPrimary },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalBackdropCentered: { justifyContent: 'center', paddingHorizontal: 24 },
-  smallModalWrap: { width: '100%', maxWidth: 360, alignSelf: 'center' },
-  smallModalCard: { backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.inputBorder },
-  smallModalTitle: { ...textFont.boldL, color: colors.textPrimary },
-  smallModalSubtitle: { ...textFont.regularS, color: colors.textSecondary, marginTop: 6 },
-  loaderCard: { backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: colors.inputBorder },
-  loadingText: { ...textFont.boldL, color: colors.textPrimary, marginTop: 16, textAlign: 'center' },
-  loadingSubtext: { ...textFont.regularS, color: colors.textSecondary, marginTop: 8, textAlign: 'center' },
-  bottomSheetWrap: { backgroundColor: colors.bgSecondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingBottom: 24 },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.lineGrey, alignSelf: 'center', marginTop: 10, marginBottom: 8 },
-  sheetContent: { paddingHorizontal: 16, paddingTop: 8, maxHeight: 520 },
-  modalHeaderText: { ...textFont.boldL, color: colors.textPrimary, marginBottom: 16 },
-  modalDeviceItem: { backgroundColor: colors.bgPrimary, padding: 12, borderRadius: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  flex: {
+    flex: 1,
+  },
+  flatListContent: {
+    paddingBottom: spacing.lg,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: colors.scrim,
+    justifyContent: 'flex-end',
+  },
+  modalBackdropCentered: {
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  smallModalWrap: {
+    width: '100%',
+    maxWidth: 360,
+    alignSelf: 'center',
+  },
+  smallModalCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    ...shadows.lg,
+  },
+  smallModalSubtitle: {
+    marginTop: spacing.xxs,
+  },
+  loaderCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.xl,
+    padding: spacing.xxl,
+    alignItems: 'center',
+    ...shadows.lg,
+  },
+  loadingText: {
+    marginTop: spacing.md,
+  },
+  loadingSubtext: {
+    marginTop: spacing.xs,
+  },
+  bottomSheetWrap: {
+    backgroundColor: colors.surfaceElevated,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
+    maxHeight: '75%',
+    paddingBottom: spacing.xl,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderStrong,
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  sheetContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    maxHeight: 520,
+  },
+  modalHeaderText: {
+    marginBottom: spacing.md,
+  },
+  modalDeviceItem: {
+    backgroundColor: colors.surfaceCard,
+    padding: spacing.sm,
+    borderRadius: radii.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  modalDeviceItemSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  wifiPasswordBlock: {
+    marginBottom: spacing.xs,
+  },
 });
+
+export default AddDevice;

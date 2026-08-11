@@ -1,6 +1,11 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { colors } from '../../themes/colors';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
+import { shadows } from '../../themes/shadows';
+import { enterDown } from '../ui/motion';
 import Icon, { IconName } from '../Icon';
 
 type AuthIconBadgeVariant = 'gold' | 'blue';
@@ -14,44 +19,34 @@ type AuthIconBadgeProps = {
 const AuthIconBadge: React.FC<AuthIconBadgeProps> = ({
   icon,
   variant = 'gold',
-  size = 32,
+  size = 34,
 }) => (
-  <View
+  <Animated.View
+    entering={enterDown(0)}
     style={[
       styles.badge,
-      variant === 'gold' ? styles.badgeGold : styles.badgeBlue,
+      shadows.md,
+      { backgroundColor: variant === 'gold' ? colors.authBadgeGold : colors.authBadgeBlue },
     ]}
   >
-    <Icon name={icon} width={size} height={size} />
-  </View>
+    <Icon
+      name={icon}
+      width={size}
+      height={size}
+      color={variant === 'gold' ? colors.cta : colors.primary}
+      strokeWidth={1.7}
+    />
+  </Animated.View>
 );
 
 const styles = StyleSheet.create({
   badge: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
+    width: 76,
+    height: 76,
+    borderRadius: radii.xl,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-  },
-  badgeGold: {
-    backgroundColor: colors.authBadgeGold,
-    shadowColor: colors.passwordLock,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  badgeBlue: {
-    backgroundColor: colors.authBadgeBlue,
-    shadowColor: colors.secondary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
+    marginBottom: spacing.xl,
   },
 });
 

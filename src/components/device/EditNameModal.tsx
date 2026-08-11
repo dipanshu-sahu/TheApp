@@ -1,15 +1,14 @@
 import React from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Pressable,
-} from 'react-native';
+import { Modal, View, StyleSheet, Pressable } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import AppText from '../ui/AppText';
+import TextField from '../ui/TextField';
+import AnimatedPressable from '../ui/AnimatedPressable';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
+import { shadows } from '../../themes/shadows';
+import { durations, easings } from '../../themes/motion';
 
 type EditNameModalProps = {
   visible: boolean;
@@ -26,89 +25,90 @@ const EditNameModal: React.FC<EditNameModalProps> = ({
   onCancel,
   onConfirm,
 }) => (
-  <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-    <Pressable style={styles.backdrop} onPress={onCancel}>
-      <Pressable style={styles.card} onPress={() => {}}>
-        <Text style={styles.title}>Edit</Text>
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder="Enter name"
-          placeholderTextColor={colors.textGrey}
-          autoFocus
-          selectTextOnFocus
-        />
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={onCancel}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
-          <View style={styles.divider} />
-          <TouchableOpacity style={styles.actionBtn} onPress={onConfirm}>
-            <Text style={styles.confirmText}>Sure</Text>
-          </TouchableOpacity>
-        </View>
+  <Modal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
+    <Animated.View
+      entering={FadeIn.duration(durations.fast)}
+      exiting={FadeOut.duration(durations.fast)}
+      style={styles.backdropFill}
+    >
+      <Pressable style={styles.backdrop} onPress={onCancel}>
+        <Animated.View entering={FadeIn.duration(durations.base).easing(easings.decelerate)}>
+          <Pressable style={[styles.card, shadows.lg]} onPress={() => {}}>
+            <AppText variant="title" align="center" style={styles.title}>
+              Edit
+            </AppText>
+            <View style={styles.inputWrap}>
+              <TextField
+                value={value}
+                onChangeText={onChangeText}
+                placeholder="Enter name"
+                autoFocus
+                selectTextOnFocus
+                containerStyle={styles.field}
+              />
+            </View>
+            <View style={styles.actions}>
+              <AnimatedPressable style={styles.actionBtn} onPress={onCancel} pressScale={0.97}>
+                <AppText variant="bodyLg" color={colors.textPrimary}>
+                  Cancel
+                </AppText>
+              </AnimatedPressable>
+              <View style={styles.divider} />
+              <AnimatedPressable style={styles.actionBtn} onPress={onConfirm} pressScale={0.97}>
+                <AppText variant="bodyLgStrong" color={colors.link}>
+                  Sure
+                </AppText>
+              </AnimatedPressable>
+            </View>
+          </Pressable>
+        </Animated.View>
       </Pressable>
-    </Pressable>
+    </Animated.View>
   </Modal>
 );
 
 const styles = StyleSheet.create({
+  backdropFill: {
+    flex: 1,
+  },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: colors.scrimStrong,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: spacing.xxl,
   },
   card: {
     width: '100%',
-    maxWidth: 320,
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
+    maxWidth: 340,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.xxl,
     overflow: 'hidden',
   },
   title: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    paddingVertical: 18,
+    paddingTop: spacing.lg,
   },
-  input: {
-    marginHorizontal: 16,
-    marginBottom: 20,
-    backgroundColor: colors.inputBackground,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    ...textFont.regularM,
-    color: colors.textPrimary,
+  inputWrap: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
+  field: {
+    marginBottom: spacing.md,
   },
   actions: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.inputBorder,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
   actionBtn: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   divider: {
-    width: 1,
-    backgroundColor: colors.inputBorder,
-  },
-  cancelText: {
-    ...textFont.regularM,
-    color: colors.textPrimary,
-  },
-  confirmText: {
-    ...textFont.boldM,
-    color: colors.link,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
   },
 });
 

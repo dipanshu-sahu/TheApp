@@ -1,93 +1,97 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import Icon from '../Icon';
+import AppText from '../ui/AppText';
+import AnimatedPressable from '../ui/AnimatedPressable';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
+import { shadows } from '../../themes/shadows';
 
 type QuickActionCardProps = {
   onPress: () => void;
 };
 
 const QuickActionCard: React.FC<QuickActionCardProps> = ({ onPress }) => (
-  <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
+  <AnimatedPressable
+    style={[styles.card, shadows.md]}
+    onPress={onPress}
+    pressScale={0.98}
+    enforceTouchTarget={false}
+  >
     <View style={styles.badge}>
-      <Text style={styles.badgeText}>NEW</Text>
+      <AppText variant="micro" color={colors.ctaText}>
+        NEW
+      </AppText>
     </View>
     <View style={styles.row}>
-      <View style={styles.iconBox}>
-        <Icon name="add-circle" width={24} height={24} stroke={colors.textPrimary} />
+      <View style={[styles.iconBox, shadows.glow]}>
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Defs>
+            <LinearGradient id="quickActionGrad" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={colors.gradPrimaryStart} />
+              <Stop offset="1" stopColor={colors.gradPrimaryEnd} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" rx={radii.md} fill="url(#quickActionGrad)" />
+        </Svg>
+        <Icon name="add-circle" width={24} height={24} stroke={colors.white} />
       </View>
       <View style={styles.textBlock}>
-        <Text style={styles.title}>Add New Device</Text>
-        <Text style={styles.subtitle}>Connect smart devices to your home</Text>
+        <AppText variant="title">Add New Device</AppText>
+        <AppText variant="body" color={colors.textSecondary}>
+          Connect smart devices to your home
+        </AppText>
+      </View>
+      <View style={styles.arrowButton}>
+        <Icon name="arrow-next" width={16} height={16} fill={colors.textPrimary} />
       </View>
     </View>
-    <TouchableOpacity style={styles.arrowButton} onPress={onPress}>
-      <Icon name="arrow-next" width={18} height={18} fill={colors.textPrimary} />
-    </TouchableOpacity>
-  </TouchableOpacity>
+  </AnimatedPressable>
 );
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    padding: 16,
-    marginBottom: 28,
-    position: 'relative',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    marginBottom: spacing.xl,
   },
   badge: {
     position: 'absolute',
-    top: 14,
-    right: 14,
-    backgroundColor: colors.badgeNew,
-    paddingHorizontal: 8,
+    top: spacing.md,
+    right: spacing.md,
+    backgroundColor: colors.cta,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: radii.xs,
     zIndex: 1,
-  },
-  badgeText: {
-    ...textFont.boldXS,
-    color: colors.textPrimary,
-    fontSize: 10,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingRight: 40,
+    gap: spacing.sm,
   },
   iconBox: {
     width: 48,
     height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.accent,
+    borderRadius: radii.md,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   textBlock: {
     flex: 1,
-  },
-  title: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  subtitle: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    lineHeight: 18,
+    gap: 2,
   },
   arrowButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.inputBorder,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.glassBorder,
     justifyContent: 'center',
     alignItems: 'center',
   },

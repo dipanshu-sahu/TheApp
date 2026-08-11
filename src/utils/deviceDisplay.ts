@@ -6,14 +6,14 @@ export type DeviceCategory = 'lighting' | 'climate' | 'security' | 'plugs';
 
 export type HomeDeviceSection = 'switch' | 'light' | 'plug';
 
-export const HOME_DEVICE_SECTIONS: {
-  id: HomeDeviceSection;
-  title: string;
-}[] = [
-    { id: 'switch', title: 'Smart Switch' },
-    { id: 'light', title: 'Light' },
-    { id: 'plug', title: 'Plug' },
-  ];
+export const HOME_DEVICE_SECTIONS: ReadonlyArray<{
+  readonly id: HomeDeviceSection;
+  readonly title: string;
+}> = [
+  { id: 'switch', title: 'Smart Switch' },
+  { id: 'light', title: 'Light' },
+  { id: 'plug', title: 'Plug' },
+];
 
 export const SWITCH_GANG_COLORS = [
   colors.primary,
@@ -22,38 +22,64 @@ export const SWITCH_GANG_COLORS = [
   colors.passwordLock,
 ] as const;
 
-export const DEVICE_CATEGORIES: {
-  id: DeviceCategory;
-  label: string;
-  icon: IconName;
-  tint: string;
-}[] = [
-    { id: 'lighting', label: 'Lighting', icon: 'intro-lightbulb', tint: '#F59E0B' },
-    { id: 'climate', label: 'Climate', icon: 'intro-ac', tint: '#38BDF8' },
-    { id: 'security', label: 'Security', icon: 'intro-camera', tint: '#A78BFA' },
-    { id: 'plugs', label: 'Plugs', icon: 'plug', tint: '#34D399' },
-  ];
+export const DEVICE_CATEGORIES: ReadonlyArray<{
+  readonly id: DeviceCategory;
+  readonly label: string;
+  readonly icon: IconName;
+  readonly tint: string;
+}> = [
+  { id: 'lighting', label: 'Lighting', icon: 'bulb',       tint: '#F59E0B' },
+  { id: 'climate',  label: 'Climate',  icon: 'thermostat', tint: '#38BDF8' },
+  { id: 'security', label: 'Security', icon: 'camera',     tint: '#A78BFA' },
+  { id: 'plugs',    label: 'Plugs',    icon: 'plug',       tint: '#34D399' },
+];
 
 export const getDeviceIcon = (name: string): IconName => {
-  const lower = name?.toLowerCase();
-  if (!!lower) {
-    if (lower.includes('switch') || lower.includes('gang')) {
-      return 'power-button';
+  const lower = name?.toLowerCase() ?? '';
+  if (lower) {
+    if (lower.includes('switch') || lower.includes('gang') || lower.includes('gpio')) {
+      return 'switch';
     }
     if (lower.includes('cam') || lower.includes('security')) {
-      return 'intro-camera';
+      return 'camera';
     }
-    if (lower.includes('ac') || lower.includes('climate') || lower.includes('fan')) {
-      return 'intro-ac';
+    if (lower.includes('fan')) {
+      return 'fan';
     }
-    if (lower.includes('plug') || lower.includes('outlet')) {
+    if (lower.includes('ac') || lower.includes('climate') || lower.includes('thermostat')) {
+      return 'thermostat';
+    }
+    if (lower.includes('plug') || lower.includes('outlet') || lower.includes('socket')) {
       return 'plug';
     }
-    if (lower.includes('led') || lower.includes('light') || lower.includes('lamp')) {
-      return 'intro-lightbulb';
+    if (lower.includes('mesh')) {
+      return 'mesh';
+    }
+    if (lower.includes('led') || lower.includes('light') || lower.includes('lamp') || lower.includes('bulb')) {
+      return 'bulb';
     }
   }
-  return 'intro-lightbulb';
+  return 'bulb';
+};
+
+export const getDeviceTint = (icon: IconName): string => {
+  switch (icon) {
+    case 'bulb':
+      return colors.cta;
+    case 'thermostat':
+    case 'fan':
+      return '#38BDF8';
+    case 'camera':
+      return '#A78BFA';
+    case 'plug':
+    case 'socket':
+      return colors.secondary;
+    case 'mesh':
+      return colors.primary;
+    case 'switch':
+    default:
+      return colors.primary;
+  }
 };
 
 export const getDeviceHomeSection = (device: DeviceInfo): HomeDeviceSection => {
@@ -63,7 +89,7 @@ export const getDeviceHomeSection = (device: DeviceInfo): HomeDeviceSection => {
   ) {
     return 'switch';
   }
-  const lower = device?.name?.toLowerCase?.() || '';
+  const lower = device?.name?.toLowerCase() ?? '';
   if (lower.includes('switch') || lower.includes('gang')) {
     return 'switch';
   }
@@ -78,7 +104,7 @@ export const getDeviceHomeSection = (device: DeviceInfo): HomeDeviceSection => {
 };
 
 export const getSwitchGangCount = (name: string): number => {
-  const match = name?.match?.(/(\d)\s*gang/i);
+  const match = name?.match(/(\d)\s*gang/i);
   if (match) {
     const count = Number.parseInt(match[1], 10);
     if (count >= 1 && count <= 4) {
@@ -89,14 +115,14 @@ export const getSwitchGangCount = (name: string): number => {
 };
 
 export const groupDevicesByHomeSection = (
-  devices: DeviceInfo[],
+  devices: readonly DeviceInfo[],
 ): Record<HomeDeviceSection, DeviceInfo[]> => {
   const grouped: Record<HomeDeviceSection, DeviceInfo[]> = {
     switch: [],
     light: [],
     plug: [],
   };
-  devices?.forEach?.(device => {
+  devices?.forEach(device => {
     grouped[getDeviceHomeSection(device)].push(device);
   });
   return grouped;
@@ -113,7 +139,7 @@ export const getDeviceStatusLabel = (device: DeviceInfo, index: number): string 
     return 'On · 24°C';
   }
   if (lower.includes('led') || lower.includes('light')) {
-    const levels = ['40%', '65%', '80%'];
+    const levels = ['40%', '65%', '80%'] as const;
     return `On · ${levels[index % levels.length]}`;
   }
   if (lower.includes('cam')) {
@@ -122,5 +148,5 @@ export const getDeviceStatusLabel = (device: DeviceInfo, index: number): string 
   return 'On';
 };
 
-export const isDeviceOnline = (device: DeviceInfo) =>
+export const isDeviceOnline = (device: DeviceInfo): boolean =>
   device.status === 'online';

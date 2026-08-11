@@ -9,7 +9,7 @@ export const storage = createMMKV({
 export const STORAGE_KEYS = {
   authToken: 'authToken',
   selectedSite: 'selectedSite',
-};
+} as const;
 
 export const setStorage = (key: string, value: string | number | boolean): void => {
   if (key) {
@@ -17,14 +17,22 @@ export const setStorage = (key: string, value: string | number | boolean): void 
   }
 };
 
-export const getStorage = (
+/**
+ * Typed overloads so callers receive the exact primitive type they requested
+ * without needing a cast at the call site.
+ */
+export function getStorage(key: string, type: 'string'): string | undefined;
+export function getStorage(key: string, type: 'number'): number | undefined;
+export function getStorage(key: string, type: 'boolean'): boolean | undefined;
+export function getStorage(key: string): string | undefined;
+export function getStorage(
   key: string,
-  typeOf?: 'string' | 'number' | 'boolean',
-): string | number | boolean | undefined => {
+  type?: 'string' | 'number' | 'boolean',
+): string | number | boolean | undefined {
   if (!key) {
     return undefined;
   }
-  switch (typeOf) {
+  switch (type) {
     case 'number':
       return storage.getNumber(key);
     case 'boolean':
@@ -32,4 +40,4 @@ export const getStorage = (
     default:
       return storage.getString(key);
   }
-};
+}

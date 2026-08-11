@@ -1,9 +1,21 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import Icon from '../Icon';
 import ToggleSwitch from '../home/ToggleSwitch';
-import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import AppText from '../ui/AppText';
+import GlassCard from '../ui/GlassCard';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import { colors, withAlpha } from '../../themes/colors';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
+import { durations } from '../../themes/motion';
 import { DeviceInfo } from '../../types/device';
 import DeviceDetailHeader from './DeviceDetailHeader';
 import EditNameModal from './EditNameModal';
@@ -13,14 +25,50 @@ type PlugDeviceDetailProps = {
   onClose: () => void;
 };
 
-const PlugDeviceDetail: React.FC<PlugDeviceDetailProps> = ({
-  device,
-  onClose,
-}) => {
+const ACCENT = colors.secondary;
+
+const StatBox: React.FC<{ value: string; label: string; icon: 'zap' | 'power-button' }> = ({
+  value,
+  label,
+  icon,
+}) => (
+  <GlassCard variant="soft" style={styles.statBox}>
+    <View style={styles.statIcon}>
+      <Icon name={icon} width={18} height={18} color={ACCENT} />
+    </View>
+    <View>
+      <AppText variant="h3">{value}</AppText>
+      <AppText variant="caption" color={colors.textSecondary}>
+        {label}
+      </AppText>
+    </View>
+  </GlassCard>
+);
+
+const PlugDeviceDetail: React.FC<PlugDeviceDetailProps> = ({ device, onClose }) => {
   const [deviceName, setDeviceName] = useState(device.name);
   const [isOn, setIsOn] = useState(device.status?.toLowerCase() === 'online');
+  const [autoEnabled, setAutoEnabled] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [editValue, setEditValue] = useState(deviceName);
+
+  const glow = useSharedValue(0);
+
+  useEffect(() => {
+    if (isOn) {
+      glow.value = withRepeat(
+        withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        -1,
+        true,
+      );
+    } else {
+      glow.value = withTiming(0, { duration: durations.base });
+    }
+  }, [isOn, glow]);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: 0.25 + glow.value * 0.45,
+  }));
 
   const handleConfirmEdit = () => {
     const trimmed = editValue.trim();
@@ -30,58 +78,64 @@ const PlugDeviceDetail: React.FC<PlugDeviceDetailProps> = ({
     setEditVisible(false);
   };
 
+  const openEdit = () => {
+    setEditValue(deviceName);
+    setEditVisible(true);
+  };
+
   return (
     <View style={styles.container}>
-      <DeviceDetailHeader
-        title={deviceName}
-        onClose={onClose}
-        onMore={() => {
-          setEditValue(deviceName);
-          setEditVisible(true);
-        }}
-      />
+      <DeviceDetailHeader title={deviceName} onClose={onClose} onMore={openEdit} />
 
       <View style={styles.hero}>
-        <View style={[styles.iconRing, isOn && styles.iconRingOn]}>
-          <Icon
-            name="plug"
-            width={52}
-            height={52}
-            fill={isOn ? colors.signupGreen : colors.textGrey}
-          />
+        <View style={styles.ringWrap}>
+          {isOn ? (
+            <Animated.View style={[styles.glow, { backgroundColor: ACCENT }, glowStyle]} />
+          ) : null}
+          <View style={[styles.iconRing, isOn && { backgroundColor: withAlpha(ACCENT, 0.16) }]}>
+            <Icon name="plug" width={52} height={52} color={isOn ? ACCENT : colors.textTertiary} strokeWidth={1.6} />
+          </View>
         </View>
-        <Text style={styles.status}>{isOn ? 'On · Powered' : 'Off'}</Text>
+        <AppText variant="h3">{isOn ? 'On · Powered' : 'Off'}</AppText>
         {device.location ? (
-          <Text style={styles.location}>{device.location}</Text>
+          <AppText variant="body" color={colors.textSecondary} style={styles.location}>
+            {device.location}
+          </AppText>
         ) : null}
       </View>
 
-      <View style={styles.controlCard}>
-        <Text style={styles.controlLabel}>Outlet</Text>
+      <GlassCard variant="soft" style={styles.controlCard}>
+        <View style={styles.controlIcon}>
+          <Icon name="power-button" width={20} height={20} color={isOn ? ACCENT : colors.textSecondary} />
+        </View>
+        <AppText variant="title" style={styles.controlLabel}>
+          Outlet
+        </AppText>
         <ToggleSwitch value={isOn} onValueChange={setIsOn} />
-      </View>
+      </GlassCard>
 
       <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>0.4 A</Text>
-          <Text style={styles.statLabel}>Current</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>92 W</Text>
-          <Text style={styles.statLabel}>Power</Text>
-        </View>
+        <StatBox value="0.4 A" label="Current" icon="zap" />
+        <StatBox value="92 W" label="Power" icon="power-button" />
       </View>
 
-      <TouchableOpacity
-        style={styles.editRow}
-        onPress={() => {
-          setEditValue(deviceName);
-          setEditVisible(true);
-        }}
-      >
-        <Text style={styles.editRowText}>Edit device name</Text>
-        <Icon name="arrow-next" width={16} height={16} fill={colors.textGrey} />
-      </TouchableOpacity>
+      <GlassCard variant="soft" style={styles.controlCard} sheen={false}>
+        <View style={styles.controlIcon}>
+          <Icon name="clock" width={20} height={20} color={autoEnabled ? colors.cta : colors.textSecondary} />
+        </View>
+        <View style={styles.controlLabel}>
+          <AppText variant="title">Automation</AppText>
+          <AppText variant="micro" color={colors.textTertiary}>
+            {autoEnabled ? 'Scheduled rules active' : 'Schedule on/off times'}
+          </AppText>
+        </View>
+        <ToggleSwitch value={autoEnabled} onValueChange={setAutoEnabled} />
+      </GlassCard>
+
+      <AnimatedPressable style={styles.editRow} onPress={openEdit} pressScale={0.98} enforceTouchTarget={false}>
+        <AppText variant="bodyLg">Edit device name</AppText>
+        <Icon name="arrow-next" width={16} height={16} color={colors.textTertiary} />
+      </AnimatedPressable>
 
       <EditNameModal
         visible={editVisible}
@@ -102,83 +156,76 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 24,
+    paddingBottom: spacing.lg,
+    gap: spacing.xs,
   },
-  iconRing: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.cardBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
+  ringWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
-  iconRingOn: {
-    backgroundColor: `${colors.signupGreen}22`,
-    borderColor: colors.signupGreen,
+  glow: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
   },
-  status: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
+  iconRing: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   location: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    marginTop: 6,
+    marginTop: spacing.xxs,
   },
   controlCard: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    padding: 16,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  controlIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   controlLabel: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
+    flex: 1,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   statBox: {
     flex: 1,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    padding: 16,
+    padding: spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
   },
-  statValue: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-  },
-  statLabel: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    marginTop: 4,
+  statIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.sm,
+    backgroundColor: withAlpha(ACCENT, 0.16),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   editRow: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    padding: 16,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: radii.lg,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  editRowText: {
-    ...textFont.regularM,
-    color: colors.textPrimary,
   },
 });
 

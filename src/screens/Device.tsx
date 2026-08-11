@@ -1,15 +1,11 @@
 import React, { useEffect, useMemo } from 'react';
-import {
-  View,
-  StyleSheet,
-  Text,
-  ActivityIndicator,
-} from 'react-native';
-import { colors } from '../themes/colors';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { textFont } from '../utils/textFont';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
+
+import Screen from '../components/ui/Screen';
+import AppText from '../components/ui/AppText';
+import { colors } from '../themes/colors';
 import { AppDispatch, RootState } from '../store/store';
 import { fetchDeviceById } from '../slices/deviceSlice';
 import { getDeviceHomeSection } from '../utils/deviceDisplay';
@@ -17,20 +13,21 @@ import { getMockDeviceById } from '../mocks/homeDevices';
 import SwitchDeviceDetail from '../components/device/SwitchDeviceDetail';
 import LightDeviceDetail from '../components/device/LightDeviceDetail';
 import PlugDeviceDetail from '../components/device/PlugDeviceDetail';
+import { MyHomeStackParamList } from '../navigation';
 
 const Device: React.FC = () => {
-  const route = useRoute();
+  const route = useRoute<RouteProp<MyHomeStackParamList, 'Device'>>();
   const navigation = useNavigation();
   const dispatch = useDispatch<AppDispatch>();
   const { deviceDetails, isLoadingDetails, error } = useSelector(
     (state: RootState) => state.devices,
   );
 
-  const deviceId = (route.params as { deviceId?: string })?.deviceId;
-  const mockDevice = deviceId ? getMockDeviceById(deviceId) : undefined;
+  const { deviceId } = route.params;
+  const mockDevice = getMockDeviceById(deviceId);
 
   useEffect(() => {
-    if (deviceId && !mockDevice) {
+    if (!mockDevice) {
       dispatch(fetchDeviceById(deviceId));
     }
   }, [deviceId, mockDevice, dispatch]);
@@ -42,29 +39,31 @@ const Device: React.FC = () => {
     [device],
   );
 
-  const handleClose = () => navigation.goBack();
+  const handleClose = (): void => navigation.goBack();
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Screen edges={['top', 'bottom']}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.accent} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   if (!device) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Screen edges={['top', 'bottom']}>
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{error || 'Device not found'}</Text>
+          <AppText variant="bodyLg" color={colors.error}>
+            {error ?? 'Device not found'}
+          </AppText>
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
-  const renderDetail = () => {
+  const renderDetail = (): React.ReactNode => {
     switch (deviceType) {
       case 'switch':
         return <SwitchDeviceDetail device={device} onClose={handleClose} />;
@@ -77,28 +76,18 @@ const Device: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <Screen edges={['top', 'bottom']} ambientTint={colors.primary}>
       {renderDetail()}
-    </SafeAreaView>
+    </Screen>
   );
 };
 
-export default Device;
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgPrimary,
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorText: {
-    ...textFont.regularM,
-    color: colors.error,
-  },
 });
+
+export default Device;

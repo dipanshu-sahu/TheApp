@@ -5,9 +5,9 @@ import {
   userLoginApi,
 } from '../apis/userAPI';
 import {
-  userLoginRequest,
+  UserLoginRequest,
   UserInfo,
-  userUpdateProfileRequest,
+  UserUpdateProfileRequest,
 } from '../types/user';
 import { addAsyncCases, ApiState, createApiState } from '../utils/reduxHelper';
 import {
@@ -40,7 +40,7 @@ const initialState: UserState = {
 const resolveCurrentUser = (users: UserInfo[]): UserInfo | null =>
   users[0] ?? null;
 
-export const userLogin = createAsyncThunk<UserInfo, userLoginRequest>(
+export const userLogin = createAsyncThunk<UserInfo, UserLoginRequest>(
   'user/login',
   async credentials => {
     await userLoginApi(credentials);
@@ -100,10 +100,11 @@ export const logout = createAsyncThunk<void, void>('user/logout', async () => {
 
 export const updateUserProfile = createAsyncThunk<
   UserInfo,
-  { userId: string; payload: userUpdateProfileRequest }
+  { userId: string; payload: UserUpdateProfileRequest }
 >('user/updateProfile', async ({ userId, payload }) => {
-  const response = await updateUserProfileApi(userId, payload);
-  const updatedUser = response.data as UserInfo;
+  // `updateUserProfileApi` is typed to return `Promise<UserInfo>` directly,
+  // so no cast is required here.
+  const updatedUser = await updateUserProfileApi(userId, payload);
   await saveUserSession(updatedUser);
   return updatedUser;
 });

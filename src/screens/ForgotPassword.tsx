@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import AuthInput from '../components/auth/AuthInput';
 import AuthFooterLink from '../components/auth/AuthFooterLink';
 import ForgotPasswordLayout from '../components/auth/ForgotPasswordLayout';
-import GradientButton from '../components/GradientButton';
-import Gap from '../components/Gap';
+import Button from '../components/ui/Button';
+import AppText from '../components/ui/AppText';
 import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
+import { spacing } from '../themes/spacing';
 import { validateField, isFieldValid } from '../utils/validators';
 import { sendForgotPasswordOtpApi } from '../apis/userAPI';
 import { extractErrorMessage } from '../utils/extractErrorMessage';
@@ -61,9 +61,9 @@ const ForgotPassword = () => {
       icon="key"
       title="Forgot Password?"
       description={
-        <Text style={{ ...textFont.regularM, color: colors.textSecondary, lineHeight: 22 }}>
+        <AppText variant="bodyLg" color={colors.textSecondary}>
           No worries! Enter your email and we&apos;ll send a reset link.
-        </Text>
+        </AppText>
       }
       footer={
         <AuthFooterLink
@@ -94,21 +94,25 @@ const ForgotPassword = () => {
       />
 
       {formError ? (
-        <>
-          <Text style={{ ...textFont.regularS, color: colors.error }}>
-            {formError}
-          </Text>
-          <Gap type="s" />
-        </>
+        <AppText variant="body" color={colors.error} style={styles.formError}>
+          {formError}
+        </AppText>
       ) : null}
 
-      <GradientButton
+      <Button
         title="Send Reset Link"
         onPress={handleSendLink}
-        isDisable={!isEnabled}
+        disabled={!isEnabled}
+        loading={isSubmitting}
       />
     </ForgotPasswordLayout>
   );
 };
+
+const styles = StyleSheet.create({
+  formError: {
+    marginBottom: spacing.sm,
+  },
+});
 
 export default ForgotPassword;

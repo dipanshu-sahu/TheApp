@@ -6,7 +6,8 @@ import {
   DigitalPin,
 } from '../types/device';
 
-const ONLINE_THRESHOLD_MS = 15 * 60 * 1000;
+/** 15 minutes — device is considered offline if not seen within this window */
+const ONLINE_THRESHOLD_MS = 15 * 60 * 1_000;
 
 export const isDeviceRecentlySeen = (lastSeen?: string | null): boolean => {
   if (!lastSeen) {
@@ -32,24 +33,25 @@ export const mapApiDeviceToDeviceInfo = (api: ApiDevice): DeviceInfo => ({
 });
 
 export const mapApiDigitalPinsToDevicePins = (
-  pins: ApiDeviceDigitalPin[],
+  pins: readonly ApiDeviceDigitalPin[],
 ): DigitalPin[] =>
   getSortedDigitalPins(
     pins.map(pin => ({ pinNumber: pin.pinNumber, state: pin.state })),
   );
 
-export const mapApiDevicesResponse = (data: unknown): DeviceInfo[] => {
-  if (!Array.isArray(data)) {
-    return [];
-  }
-  return data.map(item => mapApiDeviceToDeviceInfo(item as ApiDevice));
-};
+/**
+ * Maps a typed API response array to `DeviceInfo[]`.
+ * Accepts `ApiDevice[]` directly — the caller (the Redux slice) already holds
+ * the typed payload, so there is no need for an `unknown` guard here.
+ */
+export const mapApiDevicesResponse = (data: readonly ApiDevice[]): DeviceInfo[] =>
+  data.map(mapApiDeviceToDeviceInfo);
 
 export const isSmartSwitchDevice = (device: DeviceInfo): boolean =>
   device.deviceType === DEVICE_TYPE_SMART_SWITCH ||
   (device.digitalPins?.length ?? 0) > 0;
 
-export const getSortedDigitalPins = (pins?: DigitalPin[]): DigitalPin[] =>
+export const getSortedDigitalPins = (pins?: readonly DigitalPin[]): DigitalPin[] =>
   [...(pins ?? [])].sort((a, b) => a.pinNumber - b.pinNumber);
 
 export const getSwitchGangCountFromDevice = (device: DeviceInfo): number => {
@@ -57,7 +59,7 @@ export const getSwitchGangCountFromDevice = (device: DeviceInfo): number => {
   if (pinCount > 0) {
     return pinCount;
   }
-  const match = device.name?.match?.(/(\d)\s*gang/i);
+  const match = device.name?.match(/(\d)\s*gang/i);
   if (match) {
     const count = Number.parseInt(match[1], 10);
     if (count >= 1 && count <= 4) {
@@ -77,5 +79,5 @@ export const getSwitchGangStatesFromDevice = (device: DeviceInfo): boolean[] => 
   return Array.from({ length: gangCount }, () => deviceOn);
 };
 
-export const filterSmartSwitchDevices = (devices: DeviceInfo[]): DeviceInfo[] =>
+export const filterSmartSwitchDevices = (devices: readonly DeviceInfo[]): DeviceInfo[] =>
   devices.filter(isSmartSwitchDevice);

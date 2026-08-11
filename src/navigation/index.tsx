@@ -21,6 +21,7 @@ import {
   Devices,
 } from '../screens';
 import CustomTabBar from '../components/home/CustomTabBar';
+import { colors } from '../themes/colors';
 
 type HomeStackParamList = {
   Intro: undefined;
@@ -55,12 +56,23 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 
 const Tab = createBottomTabNavigator();
 
+const stackScreenOptions = {
+  headerShown: false,
+  animation: 'slide_from_right',
+  animationDuration: 280,
+  contentStyle: { backgroundColor: colors.bgBase },
+} as const;
+
 const HomeStackNavigator = () => {
   return (
-    <MyHomeStack.Navigator screenOptions={{ headerShown: false }}>
+    <MyHomeStack.Navigator screenOptions={stackScreenOptions}>
       <MyHomeStack.Screen name="Home" component={Home} />
       <MyHomeStack.Screen name="Device" component={Device} />
-      <MyHomeStack.Screen name="ScanDevice" component={ScanDevice} />
+      <MyHomeStack.Screen
+        name="ScanDevice"
+        component={ScanDevice}
+        options={{ animation: 'slide_from_bottom' }}
+      />
       <MyHomeStack.Screen name="AddDevice" component={AddDevice} />
     </MyHomeStack.Navigator>
   );
@@ -68,7 +80,7 @@ const HomeStackNavigator = () => {
 
 const ProfileStackNavigator = () => {
   return (
-    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+    <ProfileStack.Navigator screenOptions={stackScreenOptions}>
       <ProfileStack.Screen name="Profile" component={Profile} />
       <ProfileStack.Screen name="ResetPassword" component={ResetPassword} />
       <ProfileStack.Screen
@@ -84,16 +96,20 @@ const ProfileStackNavigator = () => {
 };
 
 const DevicesStackNavigator = () => (
-  <MyHomeStack.Navigator screenOptions={{ headerShown: false }}>
+  <MyHomeStack.Navigator screenOptions={stackScreenOptions}>
     <MyHomeStack.Screen name="Home" component={Devices} />
     <MyHomeStack.Screen name="Device" component={Device} />
   </MyHomeStack.Navigator>
 );
 
+const renderTabBar = (props: React.ComponentProps<typeof CustomTabBar>) => (
+  <CustomTabBar {...props} />
+);
+
 const TabNavigator = () => {
   return (
     <Tab.Navigator
-      tabBar={props => <CustomTabBar {...props} />}
+      tabBar={renderTabBar}
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="HomeTab" component={HomeStackNavigator} />
@@ -107,7 +123,12 @@ const TabNavigator = () => {
 const AppNavigator = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
   return (
     <AppStack.Navigator
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        animation: 'fade',
+        animationDuration: 260,
+        contentStyle: { backgroundColor: colors.bgBase },
+      }}
       initialRouteName={isAuthenticated ? 'App' : 'Intro'}
     >
       <AppStack.Screen name="Intro" component={Intro} />

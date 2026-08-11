@@ -1,68 +1,69 @@
+import { AxiosResponse } from 'axios';
 import axios from './axios';
 import {
-  userLoginRequest,
-  userRegisterRequest,
-  userResetPasswordRequest,
-  userChangePasswordRequest,
+  UserLoginRequest,
+  UserRegisterRequest,
+  UserResetPasswordRequest,
+  UserChangePasswordRequest,
   UserInfo,
-  userUpdateProfileRequest,
-  forgotPasswordOtpRequest,
-  verifyForgotPasswordOtpRequest,
-  resetPasswordWithOtpRequest,
+  UserUpdateProfileRequest,
+  ForgotPasswordOtpRequest,
+  VerifyForgotPasswordOtpRequest,
+  ResetPasswordWithOtpRequest,
 } from '../types/user';
 import { persistAuthToken } from '../utils/authSession';
 
-export const userLoginApi = async (payload: userLoginRequest) => {
-  const response = await axios.post('/api/auth/login', payload);
+export const userLoginApi = async (payload: UserLoginRequest): Promise<void> => {
+  const response = await axios.post<{ token?: string }>('/api/auth/login', payload);
   const token = response?.data?.token;
   if (token) {
     await persistAuthToken(token);
   }
-  return response.data;
 };
 
-export const userRegisterApi = async (payload: userRegisterRequest) => {
-  return axios.post('/api/Auth/register', payload);
-};
+export const userRegisterApi = async (
+  payload: UserRegisterRequest,
+): Promise<AxiosResponse<void>> =>
+  axios.post('/api/Auth/register', payload);
 
 export const userResetPasswordApi = async (
-  payload: userResetPasswordRequest,
-) => {
-  return axios.post('/api/Auth/reset-password', payload);
-};
+  payload: UserResetPasswordRequest,
+): Promise<AxiosResponse<void>> =>
+  axios.post('/api/Auth/reset-password', payload);
 
 export const sendForgotPasswordOtpApi = async (
-  payload: forgotPasswordOtpRequest,
-) => {
-  return axios.post('/api/Auth/forgot-password', payload);
-};
+  payload: ForgotPasswordOtpRequest,
+): Promise<AxiosResponse<void>> =>
+  axios.post('/api/Auth/forgot-password', payload);
 
 export const verifyForgotPasswordOtpApi = async (
-  payload: verifyForgotPasswordOtpRequest,
-) => {
-  return axios.post('/api/Auth/verify-otp', payload);
-};
+  payload: VerifyForgotPasswordOtpRequest,
+): Promise<AxiosResponse<void>> =>
+  axios.post('/api/Auth/verify-otp', payload);
 
 export const resetPasswordWithOtpApi = async (
-  payload: resetPasswordWithOtpRequest,
-) => {
-  return axios.post('/api/Auth/reset-password', payload);
-};
+  payload: ResetPasswordWithOtpRequest,
+): Promise<AxiosResponse<void>> =>
+  axios.post('/api/Auth/reset-password', payload);
 
 export const userChangePasswordApi = async (
-  payload: userChangePasswordRequest,
-) => {
-  return axios.post('/api/Auth/change-password', payload);
-};
+  payload: UserChangePasswordRequest,
+): Promise<AxiosResponse<void>> =>
+  axios.post('/api/Auth/change-password', payload);
 
 export const getUsersApi = async (): Promise<UserInfo[]> => {
-  const response = await axios.get('/api/users');
+  const response = await axios.get<UserInfo[]>('/api/users');
   return response.data;
 };
 
+/**
+ * Updates a user profile and returns the server-confirmed `UserInfo`.
+ * Typed end-to-end so the slice does not need to cast `response.data`.
+ */
 export const updateUserProfileApi = async (
   userId: string,
-  payload: userUpdateProfileRequest,
-) => {
-  return axios.put(`/api/Users/${userId}`, payload);
+  payload: UserUpdateProfileRequest,
+): Promise<UserInfo> => {
+  const response = await axios.put<UserInfo>(`/api/Users/${userId}`, payload);
+  return response.data;
 };

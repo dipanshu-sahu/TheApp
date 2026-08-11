@@ -1,12 +1,41 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import AppText from '../ui/AppText';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { spacing } from '../../themes/spacing';
+import { durations, easings } from '../../themes/motion';
 import { getPasswordStrength } from '../../utils/passwordStrength';
 
 type PasswordStrengthProps = {
   password: string;
   hint?: string;
+};
+
+const TIER_COLORS = [colors.error, colors.warning, colors.warning, colors.success];
+
+const Bar: React.FC<{ index: number; strength: number }> = ({ index, strength }) => {
+  const active = index < strength;
+  const fill = useSharedValue(0);
+
+  useEffect(() => {
+    fill.value = withTiming(active ? 1 : 0, {
+      duration: durations.fast,
+      easing: easings.standard,
+    });
+  }, [active, fill]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.2 + fill.value * 0.8,
+    transform: [{ scaleY: 0.6 + fill.value * 0.4 }],
+    backgroundColor: active ? TIER_COLORS[Math.max(0, strength - 1)] : colors.lineGrey,
+  }));
+
+  return <Animated.View style={[styles.bar, style]} />;
 };
 
 const PasswordStrength: React.FC<PasswordStrengthProps> = ({
@@ -19,43 +48,29 @@ const PasswordStrength: React.FC<PasswordStrengthProps> = ({
     <View style={styles.wrapper}>
       <View style={styles.bars}>
         {[0, 1, 2, 3].map(index => (
-          <View
-            key={index}
-            style={[
-              styles.bar,
-              index < strength ? styles.barActive : styles.barInactive,
-            ]}
-          />
+          <Bar key={index} index={index} strength={strength} />
         ))}
       </View>
-      <Text style={styles.hint}>{hint}</Text>
+      <AppText variant="caption" color={colors.textTertiary}>
+        {hint}
+      </AppText>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginTop: 8,
+    marginTop: spacing.xs,
   },
   bars: {
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 6,
+    gap: spacing.xxs + 2,
+    marginBottom: spacing.xxs + 2,
   },
   bar: {
     flex: 1,
-    height: 4,
-    borderRadius: 2,
-  },
-  barActive: {
-    backgroundColor: colors.success,
-  },
-  barInactive: {
-    backgroundColor: colors.lineGrey,
-  },
-  hint: {
-    ...textFont.regularS,
-    color: colors.textGrey,
+    height: 5,
+    borderRadius: 3,
   },
 });
 

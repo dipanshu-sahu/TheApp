@@ -33,20 +33,12 @@ export const createSite = createAsyncThunk<Site, CreateSiteRequest>(
   async payload => createSiteApi(payload),
 );
 
-/** Persist a site selection to MMKV and update Redux state. */
-export const selectSite = createAsyncThunk<Site, Site>(
-  'site/selectSite',
-  site => {
-    setStorage(SELECTED_SITE_KEY, JSON.stringify(site));
-    return site;
-  },
-);
-
 /** Read the persisted site from MMKV on app boot. */
 export const loadPersistedSite = createAsyncThunk<Site | null, void>(
   'site/loadPersistedSite',
-  () => {
-    const raw = getStorage(SELECTED_SITE_KEY, 'string') as string | undefined;
+  (): Site | null => {
+    // `getStorage` overload for 'string' returns `string | undefined`
+    const raw = getStorage(SELECTED_SITE_KEY, 'string');
     if (!raw) {
       return null;
     }
@@ -68,32 +60,44 @@ export const siteSlice = createSlice({
     setSelectedSite: (state, action: PayloadAction<Site | null>) => {
       state.selectedSite = action.payload;
     },
+    /**
+     * Synchronously selects a site and persists the choice to MMKV.
+     * Previously implemented as an AsyncThunk despite being synchronous —
+     * converted to a plain reducer to eliminate unnecessary async overhead.
+     */
+    selectSite: (state, action: PayloadAction<Site>) => {
+      state.selectedSite = action.payload;
+      setStorage(SELECTED_SITE_KEY, JSON.stringify(action.payload));
+    },
   },
   extraReducers: builder => {
-    addAsyncCases(builder, fetchSitesByUser, 'fetchSitesApi', undefined, (state, action) => {
-      const sites = action.payload as Site[];
-      state.sites = sites;
+    addAsyncCases(
+      builder,
+      fetchSitesByUser,
+      'fetchSitesApi',
+      undefined,
+      (state, action) => {
+        const sites = action.payload;
+        state.sites = sites;
 
-      // Auto-select the first site if nothing is currently selected
-      if (!state.selectedSite && sites.length > 0) {
-        state.selectedSite = sites[0];
-        setStorage(SELECTED_SITE_KEY, JSON.stringify(sites[0]));
-      }
-    });
+        // Auto-select the first site if nothing is currently selected
+        if (!state.selectedSite && sites.length > 0) {
+          state.selectedSite = sites[0];
+          setStorage(SELECTED_SITE_KEY, JSON.stringify(sites[0]));
+        }
+      },
+    );
+
     addAsyncCases(builder, createSite, 'createSiteApi', 'currentSite');
 
-    builder
-      .addCase(selectSite.fulfilled, (state, action) => {
+    builder.addCase(loadPersistedSite.fulfilled, (state, action) => {
+      if (action.payload) {
         state.selectedSite = action.payload;
-      })
-      .addCase(loadPersistedSite.fulfilled, (state, action) => {
-        if (action.payload) {
-          state.selectedSite = action.payload;
-        }
-      });
+      }
+    });
   },
 });
 
-export const { clearCurrentSite, setSelectedSite } = siteSlice.actions;
+export const { clearCurrentSite, setSelectedSite, selectSite } = siteSlice.actions;
 
 export default siteSlice.reducer;

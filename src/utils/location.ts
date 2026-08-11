@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { PERMISSIONS, request, RESULTS } from 'react-native-permissions';
+import { hasLocationPermission } from './permissions';
 
 export type Coordinates = {
   latitude: number;
@@ -35,7 +36,11 @@ const getGeolocationModule = (): GeolocationModule | null => {
   }
 };
 
-const requestLocationPermission = async (): Promise<boolean> => {
+const ensureLocationPermission = async (): Promise<boolean> => {
+  if (await hasLocationPermission()) {
+    return true;
+  }
+
   const permission =
     Platform.OS === 'ios'
       ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
@@ -58,7 +63,7 @@ export const getCurrentCoordinates = async (): Promise<Coordinates> => {
     return DEFAULT_COORDINATES;
   }
 
-  const granted = await requestLocationPermission();
+  const granted = await ensureLocationPermission();
   if (!granted) {
     return DEFAULT_COORDINATES;
   }

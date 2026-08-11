@@ -1,24 +1,24 @@
 import React, { useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
+import Animated from 'react-native-reanimated';
 
-import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
+import Screen from '../components/ui/Screen';
+import AppText from '../components/ui/AppText';
+import GlassCard from '../components/ui/GlassCard';
+import AnimatedPressable from '../components/ui/AnimatedPressable';
+import Icon from '../components/Icon';
+import { IconName } from '../types/icons';
+import { enterFade, enterUp } from '../components/ui/motion';
+import { colors, withAlpha } from '../themes/colors';
+import { radii } from '../themes/radii';
+import { spacing } from '../themes/spacing';
 import { AppDispatch, RootState } from '../store/store';
 import { fetchUsers, logout } from '../slices/userSlice';
 import { isDeviceOnline } from '../utils/deviceDisplay';
-import ProfileMenuItem from '../components/profile/ProfileMenuItem';
-import ProfileSection from '../components/profile/ProfileSection';
+import ProfileCard from '../components/profile/ProfileCard';
 
 type RootStackParamList = {
   Intro: undefined;
@@ -26,9 +26,65 @@ type RootStackParamList = {
   App: undefined;
 };
 
+type ActionTile = {
+  icon: IconName;
+  label: string;
+  value?: string;
+  accent: string;
+  onPress?: () => void;
+  destructive?: boolean;
+};
+
+const ActionBlock: React.FC<{ tile: ActionTile }> = ({ tile }) => (
+  <AnimatedPressable
+    onPress={tile.onPress}
+    disabled={!tile.onPress}
+    pressScale={tile.onPress ? 0.97 : 1}
+    enforceTouchTarget={false}
+    style={styles.actionWrap}
+  >
+    <GlassCard variant="soft" sheen={false} style={styles.actionCard}>
+      <View
+        style={[
+          styles.actionIcon,
+          {
+            backgroundColor: withAlpha(
+              tile.destructive ? colors.error : tile.accent,
+              0.16,
+            ),
+          },
+        ]}
+      >
+        <Icon
+          name={tile.icon}
+          width={22}
+          height={22}
+          color={tile.destructive ? colors.error : tile.accent}
+        />
+      </View>
+      <AppText
+        variant="bodyLgStrong"
+        color={tile.destructive ? colors.error : colors.textPrimary}
+        numberOfLines={1}
+      >
+        {tile.label}
+      </AppText>
+      {tile.value ? (
+        <AppText variant="caption" color={colors.textSecondary} numberOfLines={1}>
+          {tile.value}
+        </AppText>
+      ) : null}
+      {tile.onPress && !tile.destructive ? (
+        <View style={styles.chevron}>
+          <Icon name="chevron-right" width={16} height={16} color={colors.textTertiary} />
+        </View>
+      ) : null}
+    </GlassCard>
+  </AnimatedPressable>
+);
+
 const Profile = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const dispatch = useDispatch<AppDispatch>();
   const { user, fetchUserApi } = useSelector((state: RootState) => state.user);
   const { devices: apiDevices } = useSelector((state: RootState) => state.devices);
@@ -48,7 +104,7 @@ const Profile = () => {
     ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'User'
     : 'Guest User';
   const email = user?.email ?? 'Not signed in';
-  const phone = user?.phoneNumber ?? 'Add phone number';
+  const phone = user?.phoneNumber ?? 'Add phone';
   const accountType = user?.userType ?? 'Home Owner';
   const avatarLabel = (user?.firstName?.charAt(0) || 'U').toUpperCase();
   const deviceCount = apiDevices?.length ?? 0;
@@ -60,245 +116,204 @@ const Profile = () => {
     );
   };
 
+  const accountTiles: ActionTile[] = [
+    {
+      icon: 'profile',
+      label: 'Edit Profile',
+      value: displayName,
+      accent: colors.primary,
+      onPress: () => navigation.navigate('ProfileUpdate' as never),
+    },
+    {
+      icon: 'mail',
+      label: 'Email',
+      value: email,
+      accent: colors.gradPrimaryEnd,
+    },
+    {
+      icon: 'phone',
+      label: 'Phone',
+      value: phone,
+      accent: colors.secondary,
+      onPress: () => navigation.navigate('ProfileUpdate' as never),
+    },
+    {
+      icon: 'lock-key',
+      label: 'Password',
+      value: 'Change',
+      accent: colors.cta,
+      onPress: () => navigation.navigate('ChangePassword' as never),
+    },
+  ];
+
+  const prefTiles: ActionTile[] = [
+    {
+      icon: 'settings',
+      label: 'Settings',
+      value: 'Prefs',
+      accent: colors.primary,
+      onPress: () => navigation.navigate('AutoTab' as never),
+    },
+    {
+      icon: 'devices',
+      label: 'Devices',
+      value: `${deviceCount} linked`,
+      accent: colors.secondary,
+      onPress: () => navigation.getParent()?.navigate('DevicesTab' as never),
+    },
+    {
+      icon: 'bell',
+      label: 'Support',
+      value: 'Help',
+      accent: colors.gradPrimaryEnd,
+      onPress: () => {},
+    },
+    {
+      icon: 'power-button',
+      label: 'Log Out',
+      accent: colors.error,
+      destructive: true,
+      onPress: handleLogout,
+    },
+  ];
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.header}>
-          <Text style={styles.screenTitle}>Profile</Text>
+    <Screen edges={['top']} scroll contentContainerStyle={styles.scrollContent}>
+      <Animated.View entering={enterFade(0)} style={styles.header}>
+        <AppText variant="h1">Profile</AppText>
+        <AppText variant="body" color={colors.textSecondary}>
+          Account & preferences
+        </AppText>
+      </Animated.View>
+
+      {fetchUserApi.loading && !user ? (
+        <ActivityIndicator color={colors.primary} style={styles.loader} />
+      ) : null}
+
+      <Animated.View entering={enterUp(1)}>
+        <ProfileCard
+          avatarLabel={avatarLabel}
+          displayName={displayName}
+          email={email}
+          accountType={accountType}
+        />
+      </Animated.View>
+
+      {/* Stats bento */}
+      <Animated.View entering={enterUp(2)} style={styles.statsRow}>
+        {[
+          { value: deviceCount, label: 'Devices', accent: colors.primary },
+          { value: onlineCount, label: 'Online', accent: colors.success },
+          { value: 1, label: 'Homes', accent: colors.cta },
+        ].map(stat => (
+          <GlassCard key={stat.label} variant="soft" sheen={false} style={styles.statCard}>
+            <AppText variant="h2" color={stat.accent}>
+              {stat.value}
+            </AppText>
+            <AppText variant="caption" color={colors.textSecondary}>
+              {stat.label}
+            </AppText>
+          </GlassCard>
+        ))}
+      </Animated.View>
+
+      <Animated.View entering={enterUp(3)}>
+        <AppText variant="labelCaps" color={colors.textTertiary} style={styles.sectionLabel}>
+          Account
+        </AppText>
+        <View style={styles.grid}>
+          {accountTiles.map(tile => (
+            <ActionBlock key={tile.label} tile={tile} />
+          ))}
         </View>
+      </Animated.View>
 
-        {fetchUserApi.loading && !user ? (
-          <ActivityIndicator color={colors.accent} style={styles.loader} />
-        ) : null}
-
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{avatarLabel}</Text>
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.name}>{displayName}</Text>
-            <Text style={styles.email}>{email}</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{accountType}</Text>
-            </View>
-          </View>
+      <Animated.View entering={enterUp(4)}>
+        <AppText variant="labelCaps" color={colors.textTertiary} style={styles.sectionLabel}>
+          Preferences
+        </AppText>
+        <View style={styles.grid}>
+          {prefTiles.map(tile => (
+            <ActionBlock key={tile.label} tile={tile} />
+          ))}
         </View>
+      </Animated.View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{deviceCount}</Text>
-            <Text style={styles.statLabel}>Devices</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{onlineCount}</Text>
-            <Text style={styles.statLabel}>Online</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>1</Text>
-            <Text style={styles.statLabel}>Homes</Text>
-          </View>
-        </View>
-
-        <ProfileSection title="Account">
-          <ProfileMenuItem
-            icon="profile"
-            label="Edit Profile"
-            value={displayName}
-            onPress={() => navigation.navigate('ProfileUpdate' as never)}
-          />
-          <View style={styles.divider} />
-          <ProfileMenuItem
-            icon="mail"
-            label="Email"
-            value={email}
-            showChevron={false}
-          />
-          <View style={styles.divider} />
-          <ProfileMenuItem
-            icon="phone"
-            label="Phone"
-            value={phone}
-            onPress={() => navigation.navigate('ProfileUpdate' as never)}
-          />
-          <View style={styles.divider} />
-          <ProfileMenuItem
-            icon="lock-key"
-            label="Change Password"
-            onPress={() => navigation.navigate('ChangePassword' as never)}
-          />
-        </ProfileSection>
-
-        <ProfileSection title="Preferences">
-          <ProfileMenuItem
-            icon="settings"
-            label="App Settings"
-            value="Notifications, theme"
-            onPress={() => navigation.navigate('AutoTab' as never)}
-          />
-          <View style={styles.divider} />
-          <ProfileMenuItem
-            icon="devices"
-            label="Manage Devices"
-            value={`${deviceCount} connected`}
-            onPress={() => navigation.getParent()?.navigate('DevicesTab' as never)}
-          />
-        </ProfileSection>
-
-        <ProfileSection title="Support">
-          <ProfileMenuItem icon="mail-otp" label="Help & Support" onPress={() => {}} />
-          <View style={styles.divider} />
-          <ProfileMenuItem
-            icon="check-circle"
-            label="About App"
-            value="v0.0.1"
-            onPress={() => {}}
-          />
-        </ProfileSection>
-
-        <View style={styles.section}>
-          <View style={styles.sectionCard}>
-            <ProfileMenuItem
-              icon="power-button"
-              label="Log Out"
-              onPress={handleLogout}
-              destructive
-              showChevron={false}
-            />
-          </View>
-        </View>
-
-        {!user ? (
-          <TouchableOpacity
-            style={styles.signInBtn}
-            onPress={() =>
-              navigation.getParent()?.getParent()?.dispatch(
-                CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] }),
-              )
-            }
-          >
-            <Text style={styles.signInText}>Sign In</Text>
-          </TouchableOpacity>
-        ) : null}
-      </ScrollView>
-    </SafeAreaView>
+      {!user ? (
+        <AnimatedPressable
+          style={styles.signInBtn}
+          pressScale={0.97}
+          onPress={() =>
+            navigation.getParent()?.getParent()?.dispatch(
+              CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] }),
+            )
+          }
+        >
+          <AppText variant="bodyLgStrong" color={colors.link}>
+            Sign In
+          </AppText>
+        </AnimatedPressable>
+      ) : null}
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.homeBg,
-  },
   scrollContent: {
-    paddingHorizontal: 20,
     paddingBottom: 120,
   },
   header: {
-    marginBottom: 20,
-    marginTop: 8,
-  },
-  screenTitle: {
-    ...textFont.boldXXL,
-    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+    gap: spacing.xxs,
   },
   loader: {
-    marginBottom: 16,
-  },
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    padding: 16,
-    marginBottom: 16,
-    gap: 14,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    ...textFont.boldXL,
-    color: colors.textPrimary,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  name: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-  },
-  email: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    backgroundColor: `${colors.accent}22`,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    ...textFont.regularS,
-    color: colors.link,
+    marginBottom: spacing.md,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 24,
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    paddingVertical: 14,
+    paddingVertical: spacing.md,
     alignItems: 'center',
+    gap: spacing.xxs,
   },
-  statValue: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
+  sectionLabel: {
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xxs,
   },
-  statLabel: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    marginTop: 4,
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
   },
-  section: {
-    marginBottom: 18,
+  actionWrap: {
+    width: '48.2%',
   },
-  sectionCard: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    overflow: 'hidden',
+  actionCard: {
+    padding: spacing.md,
+    minHeight: 118,
+    gap: spacing.xs,
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.inputBorder,
-    marginLeft: 62,
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xxs,
+  },
+  chevron: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
   },
   signInBtn: {
     alignItems: 'center',
-    paddingVertical: 14,
-  },
-  signInText: {
-    ...textFont.boldM,
-    color: colors.link,
+    paddingVertical: spacing.md,
   },
 });
 

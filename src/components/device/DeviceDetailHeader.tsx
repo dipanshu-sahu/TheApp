@@ -1,8 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Icon from '../Icon';
+import AppText from '../ui/AppText';
+import AnimatedPressable from '../ui/AnimatedPressable';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
 
 type DeviceDetailHeaderProps = {
   title: string;
@@ -10,25 +13,25 @@ type DeviceDetailHeaderProps = {
   onMore?: () => void;
 };
 
-const DeviceDetailHeader: React.FC<DeviceDetailHeaderProps> = ({
-  title,
-  onClose,
-  onMore,
+const IconButton: React.FC<{ icon: 'more' | 'close'; onPress: () => void; size: number }> = ({
+  icon,
+  onPress,
+  size,
 }) => (
+  <AnimatedPressable style={styles.iconBtn} onPress={onPress} pressScale={0.88}>
+    <Icon name={icon} width={size} height={size} fill={colors.textSecondary} />
+  </AnimatedPressable>
+);
+
+const DeviceDetailHeader: React.FC<DeviceDetailHeaderProps> = ({ title, onClose, onMore }) => (
   <View style={styles.header}>
     <View style={styles.side} />
-    <Text style={styles.title} numberOfLines={1}>
+    <AppText variant="title" numberOfLines={1} style={styles.title}>
       {title}
-    </Text>
+    </AppText>
     <View style={[styles.side, styles.sideRight]}>
-      {onMore ? (
-        <TouchableOpacity onPress={onMore} hitSlop={10} style={styles.iconBtn}>
-          <Icon name="more" width={20} height={20} fill={colors.textSecondary} />
-        </TouchableOpacity>
-      ) : null}
-      <TouchableOpacity onPress={onClose} hitSlop={10} style={styles.iconBtn}>
-        <Icon name="close" width={18} height={18} fill={colors.textSecondary} />
-      </TouchableOpacity>
+      {onMore ? <IconButton icon="more" onPress={onMore} size={20} /> : null}
+      <IconButton icon="close" onPress={onClose} size={18} />
     </View>
   </View>
 );
@@ -37,31 +40,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    marginBottom: 16,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.md,
   },
   side: {
-    width: 72,
+    width: 76,
   },
   sideRight: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.xs,
   },
   title: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
     flex: 1,
     textAlign: 'center',
   },
   iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.bgSecondary,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },

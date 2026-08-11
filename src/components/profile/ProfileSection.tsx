@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-
+import { View, StyleSheet } from 'react-native';
+import GlassCard from '../ui/GlassCard';
+import AppText from '../ui/AppText';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { spacing } from '../../themes/spacing';
 
 type ProfileSectionProps = {
   title: string;
@@ -11,27 +12,25 @@ type ProfileSectionProps = {
 
 const ProfileSection: React.FC<ProfileSectionProps> = ({ title, children }) => (
   <View style={styles.section}>
-    <Text style={styles.sectionTitle}>{title}</Text>
-    <View style={styles.sectionCard}>{children}</View>
+    <AppText variant="labelCaps" color={colors.textTertiary} style={styles.sectionTitle}>
+      {title}
+    </AppText>
+    <GlassCard variant="soft" sheen={false} style={styles.sectionCard}>
+      {children}
+    </GlassCard>
   </View>
 );
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 18,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    ...textFont.boldM,
-    color: colors.textSecondary,
-    marginBottom: 10,
-    letterSpacing: 0.3,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xxs,
   },
   sectionCard: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    overflow: 'hidden',
+    padding: 0,
   },
 });
 

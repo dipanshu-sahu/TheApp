@@ -1,19 +1,23 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  TouchableOpacity,
   Modal,
   Pressable,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import Animated from 'react-native-reanimated';
 
 import Icon from '../Icon';
+import AppText from '../ui/AppText';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import { enterUp } from '../ui/motion';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
+import { shadows } from '../../themes/shadows';
 import { selectSite } from '../../slices/siteSlice';
 import { AppDispatch, RootState } from '../../store/store';
 import { Site } from '../../types/site';
@@ -42,19 +46,18 @@ const SiteDropdown: React.FC<SiteDropdownProps> = ({ onAddSite }) => {
 
   return (
     <>
-      <TouchableOpacity
+      <AnimatedPressable
         style={styles.pill}
         onPress={() => setSheetVisible(true)}
-        activeOpacity={0.8}
+        pressScale={0.96}
+        enforceTouchTarget={false}
       >
         <Icon name="map" width={16} height={16} fill={colors.primary} />
-        <Text style={styles.pillLabel} numberOfLines={1}>
-          {fetchSitesApi.loading
-            ? 'Loading...'
-            : selectedSite?.location ?? 'No site available'}
-        </Text>
+        <AppText variant="body" color={colors.textPrimary} numberOfLines={1} style={styles.pillLabel}>
+          {fetchSitesApi.loading ? 'Loading...' : selectedSite?.location ?? 'No site available'}
+        </AppText>
         <Icon name="arrow-down" width={14} height={14} fill={colors.textSecondary} />
-      </TouchableOpacity>
+      </AnimatedPressable>
 
       <Modal
         visible={sheetVisible}
@@ -63,75 +66,67 @@ const SiteDropdown: React.FC<SiteDropdownProps> = ({ onAddSite }) => {
         onRequestClose={() => setSheetVisible(false)}
       >
         <Pressable style={styles.backdrop} onPress={() => setSheetVisible(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
+          <Pressable style={[styles.sheet, shadows.lg]} onPress={() => {}}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Select Site</Text>
+            <AppText variant="title" style={styles.sheetTitle}>
+              Select Site
+            </AppText>
 
             {fetchSitesApi.loading ? (
-              <ActivityIndicator
-                color={colors.accent}
-                style={styles.loader}
-              />
+              <ActivityIndicator color={colors.primary} style={styles.loader} />
             ) : (
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.listContent}
-              >
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
                 {sites.length === 0 ? (
-                  <Text style={styles.emptyText}>No sites available</Text>
+                  <AppText variant="bodyLg" color={colors.textSecondary} style={styles.emptyText}>
+                    No sites available
+                  </AppText>
                 ) : (
-                  sites.map(site => {
+                  sites.map((site, index) => {
                     const isSelected = selectedSite?.siteId === site.siteId;
                     return (
-                      <TouchableOpacity
-                        key={site.siteId}
-                        style={[styles.siteRow, isSelected && styles.siteRowSelected]}
-                        onPress={() => handleSelectSite(site)}
-                        activeOpacity={0.85}
-                      >
-                        <View style={styles.siteRowLeft}>
-                          <Icon
-                            name="map"
-                            width={18}
-                            height={18}
-                            fill={isSelected ? colors.primary : colors.textSecondary}
-                          />
-                          <Text
-                            style={[
-                              styles.siteLabel,
-                              isSelected && styles.siteLabelSelected,
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {site.location}
-                          </Text>
-                        </View>
-                        {isSelected ? (
-                          <Icon
-                            name="check"
-                            width={16}
-                            height={16}
-                            fill={colors.primary}
-                          />
-                        ) : null}
-                      </TouchableOpacity>
+                      <Animated.View key={site.siteId} entering={enterUp(index, 40)}>
+                        <AnimatedPressable
+                          style={[styles.siteRow, isSelected && styles.siteRowSelected]}
+                          onPress={() => handleSelectSite(site)}
+                          pressScale={0.98}
+                          enforceTouchTarget={false}
+                        >
+                          <View style={styles.siteRowLeft}>
+                            <Icon
+                              name="map"
+                              width={18}
+                              height={18}
+                              fill={isSelected ? colors.primary : colors.textSecondary}
+                            />
+                            <AppText
+                              variant={isSelected ? 'bodyLgStrong' : 'bodyLg'}
+                              color={isSelected ? colors.textPrimary : colors.textSecondary}
+                              numberOfLines={1}
+                              style={styles.siteLabel}
+                            >
+                              {site.location}
+                            </AppText>
+                          </View>
+                          {isSelected ? (
+                            <Icon name="check" width={16} height={16} fill={colors.primary} />
+                          ) : null}
+                        </AnimatedPressable>
+                      </Animated.View>
                     );
                   })
                 )}
 
-                <TouchableOpacity
+                <AnimatedPressable
                   style={styles.addSiteRow}
                   onPress={handleAddSite}
-                  activeOpacity={0.85}
+                  pressScale={0.98}
+                  enforceTouchTarget={false}
                 >
-                  <Icon
-                    name="add-circle"
-                    width={18}
-                    height={18}
-                    fill={colors.primary}
-                  />
-                  <Text style={styles.addSiteLabel}>Add Site</Text>
-                </TouchableOpacity>
+                  <Icon name="add-circle" width={18} height={18} fill={colors.primary} />
+                  <AppText variant="bodyLg" color={colors.primary}>
+                    Add Site
+                  </AppText>
+                </AnimatedPressable>
               </ScrollView>
             )}
           </Pressable>
@@ -145,100 +140,88 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.xs,
     alignSelf: 'flex-start',
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    paddingHorizontal: 14,
+    backgroundColor: colors.glassStrong,
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.glassBorderStrong,
+    paddingHorizontal: spacing.md,
     height: 44,
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   pillLabel: {
-    ...textFont.regularM,
-    color: colors.textPrimary,
-    maxWidth: 180,
+    maxWidth: 200,
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: colors.scrim,
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.bgSecondary,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 32,
+    backgroundColor: colors.bgElevated,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingBottom: spacing.xxl,
     maxHeight: '65%',
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.glassBorder,
   },
   sheetHandle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.lineGrey,
+    backgroundColor: colors.borderStrong,
     alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xxs,
   },
   sheetTitle: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.inputBorder,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   loader: {
-    marginVertical: 24,
+    marginVertical: spacing.xl,
   },
   listContent: {
-    paddingVertical: 8,
+    paddingVertical: spacing.xs,
   },
   emptyText: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   siteRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    marginHorizontal: spacing.sm,
   },
   siteRowSelected: {
-    backgroundColor: `${colors.primary}18`,
+    backgroundColor: colors.primarySoft,
   },
   siteRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.sm,
     flex: 1,
   },
   siteLabel: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
     flex: 1,
-  },
-  siteLabelSelected: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
   },
   addSiteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: colors.inputBorder,
-    marginTop: 4,
-  },
-  addSiteLabel: {
-    ...textFont.regularM,
-    color: colors.primary,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    marginTop: spacing.xxs,
   },
 });
 

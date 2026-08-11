@@ -2,6 +2,8 @@ import React from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 
 import { colors } from '../../themes/colors';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
 import { useSmartSwitchControl } from '../../hooks/useSmartSwitchControl';
 import { DeviceInfo } from '../../types/device';
 import SmartSwitchDeviceCard from './SmartSwitchDeviceCard';
@@ -15,13 +17,8 @@ const ConnectedSmartSwitchCard: React.FC<ConnectedSmartSwitchCardProps> = ({
   device,
   onPress,
 }) => {
-  const {
-    gangStates,
-    mainOn,
-    isSending,
-    setGangAtIndex,
-    setMainToggle,
-  } = useSmartSwitchControl(device);
+  const { gangStates, mainOn, isSending, setGangAtIndex, setMainToggle } =
+    useSmartSwitchControl(device);
 
   const subtitle = device.location ? ` · ${device.location}` : '';
 
@@ -38,7 +35,7 @@ const ConnectedSmartSwitchCard: React.FC<ConnectedSmartSwitchCardProps> = ({
       />
       {isSending ? (
         <View style={styles.sendingOverlay}>
-          <ActivityIndicator color={colors.accent} size="small" />
+          <ActivityIndicator color={colors.primary} size="small" />
         </View>
       ) : null}
     </View>
@@ -50,12 +47,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   sendingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(10, 14, 26, 0.35)',
-    borderRadius: 16,
-    marginBottom: 12,
+    backgroundColor: colors.scrim,
+    borderRadius: radii.xl,
+    marginBottom: spacing.sm,
   },
 });
 

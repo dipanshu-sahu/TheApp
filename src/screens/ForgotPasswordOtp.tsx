@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import OtpInput from '../components/auth/OtpInput';
 import AuthFooterLink from '../components/auth/AuthFooterLink';
 import ForgotPasswordLayout from '../components/auth/ForgotPasswordLayout';
-import GradientButton from '../components/GradientButton';
-import Gap from '../components/Gap';
+import Button from '../components/ui/Button';
+import AppText from '../components/ui/AppText';
 import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
+import { spacing } from '../themes/spacing';
 import { validateField, isFieldValid } from '../utils/validators';
 import {
   sendForgotPasswordOtpApi,
@@ -98,12 +98,12 @@ const ForgotPasswordOtp = () => {
       iconVariant="blue"
       title="Check Your Email"
       description={
-        <Text style={{ ...textFont.regularM, color: colors.textSecondary, lineHeight: 22 }}>
+        <AppText variant="bodyLg" color={colors.textSecondary}>
           We sent a 6-digit code to{' '}
-          <Text style={{ ...textFont.boldM, color: colors.textPrimary }}>
+          <AppText variant="bodyLgStrong" color={colors.textPrimary}>
             {email}
-          </Text>
-        </Text>
+          </AppText>
+        </AppText>
       }
       footer={
         <AuthFooterLink
@@ -127,30 +127,38 @@ const ForgotPasswordOtp = () => {
       />
 
       {error ? (
-        <Text style={{ ...textFont.regularS, color: colors.error, marginBottom: 8 }}>
+        <AppText variant="body" color={colors.error} style={styles.spacer}>
           {error}
-        </Text>
+        </AppText>
       ) : (
-        <Text style={{ ...textFont.regularM, color: colors.textSecondary, marginBottom: 20 }}>
+        <AppText variant="bodyLg" color={colors.textSecondary} style={styles.spacer}>
           Code expires in{' '}
-          <Text style={{ ...textFont.boldM, color: colors.timer }}>{formatted}</Text>
-        </Text>
+          <AppText variant="bodyLgStrong" color={colors.timer}>
+            {formatted}
+          </AppText>
+        </AppText>
       )}
 
       {formError ? (
-        <>
-          <Text style={{ ...textFont.regularS, color: colors.error }}>{formError}</Text>
-          <Gap type="s" />
-        </>
+        <AppText variant="body" color={colors.error} style={styles.spacer}>
+          {formError}
+        </AppText>
       ) : null}
 
-      <GradientButton
+      <Button
         title="Verify Code"
         onPress={handleVerify}
-        isDisable={!isEnabled}
+        disabled={!isEnabled}
+        loading={isSubmitting}
       />
     </ForgotPasswordLayout>
   );
 };
+
+const styles = StyleSheet.create({
+  spacer: {
+    marginBottom: spacing.lg,
+  },
+});
 
 export default ForgotPasswordOtp;

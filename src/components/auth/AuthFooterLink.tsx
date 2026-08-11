@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import AppText from '../ui/AppText';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { spacing } from '../../themes/spacing';
 
 type AuthFooterLinkProps = {
   prefix: string;
@@ -15,26 +17,24 @@ const AuthFooterLink: React.FC<AuthFooterLinkProps> = ({
   onPress,
 }) => (
   <View style={styles.wrapper}>
-    <Text style={styles.prefix}>{prefix}</Text>
-    <TouchableOpacity onPress={onPress}>
-      <Text style={styles.link}>{linkText}</Text>
-    </TouchableOpacity>
+    <AppText variant="bodyLg" color={colors.textSecondary}>
+      {prefix}
+    </AppText>
+    <AnimatedPressable onPress={onPress} pressScale={0.95}>
+      <AppText variant="bodyLgStrong" color={colors.link}>
+        {linkText}
+      </AppText>
+    </AnimatedPressable>
   </View>
 );
 
 const styles = StyleSheet.create({
   wrapper: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
-  },
-  prefix: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-  },
-  link: {
-    ...textFont.boldM,
-    color: colors.link,
+    marginTop: spacing.xl,
+    gap: spacing.xxs,
   },
 });
 

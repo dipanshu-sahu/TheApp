@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import {
   Modal,
   View,
-  Text,
   StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -15,8 +11,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Toast } from 'toastify-react-native';
 
 import Icon from '../Icon';
+import AppText from '../ui/AppText';
+import Button from '../ui/Button';
+import TextField from '../ui/TextField';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import AmbientBackground from '../ui/AmbientBackground';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { spacing } from '../../themes/spacing';
 import { createSite } from '../../slices/siteSlice';
 import { AppDispatch, RootState } from '../../store/store';
 import { Site } from '../../types/site';
@@ -28,11 +29,7 @@ type CreateSiteModalProps = {
   onCreated: (site: Site) => void;
 };
 
-const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
-  visible,
-  onClose,
-  onCreated,
-}) => {
+const CreateSiteModal: React.FC<CreateSiteModalProps> = ({ visible, onClose, onCreated }) => {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.user);
   const { createSiteApi } = useSelector((state: RootState) => state.site);
@@ -68,8 +65,7 @@ const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
     }
 
     const username =
-      `${currentUser.firstName ?? ''} ${currentUser.lastName ?? ''}`.trim() ||
-      currentUser.email;
+      `${currentUser.firstName ?? ''} ${currentUser.lastName ?? ''}`.trim() || currentUser.email;
 
     try {
       const site = await dispatch(
@@ -96,29 +92,33 @@ const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       onRequestClose={handleClose}
     >
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <AmbientBackground />
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} hitSlop={12} disabled={isSubmitting}>
-              <Icon name="close" width={22} height={22} fill={colors.greyLight} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>New Site</Text>
+            <AnimatedPressable onPress={handleClose} disabled={isSubmitting} pressScale={0.9}>
+              <Icon name="close" width={22} height={22} fill={colors.textSecondary} />
+            </AnimatedPressable>
+            <AppText variant="title" style={styles.headerTitle}>
+              New Site
+            </AppText>
             <View style={styles.headerSpacer} />
           </View>
 
           <View style={styles.body}>
-            <Text style={styles.title}>Create a Site</Text>
-            <Text style={styles.subtitle}>
+            <AppText variant="h1" style={styles.title}>
+              Create a Site
+            </AppText>
+            <AppText variant="bodyLg" color={colors.textSecondary} style={styles.subtitle}>
               A site groups your devices by physical location (e.g. "My Home", "Office").
-            </Text>
+            </AppText>
 
-            <Text style={styles.inputLabel}>Location Name</Text>
-            <TextInput
-              style={styles.input}
+            <TextField
+              label="Location Name"
+              icon="map"
               placeholder="e.g. My Home, Office"
-              placeholderTextColor={colors.textGrey}
               value={locationName}
               onChangeText={setLocationName}
               editable={!isSubmitting}
@@ -129,18 +129,12 @@ const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
           </View>
 
           <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.createButton, isDisabled && styles.createButtonDisabled]}
+            <Button
+              title="Create Site"
               onPress={handleCreate}
               disabled={isDisabled}
-              activeOpacity={0.85}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color={colors.textPrimary} size="small" />
-              ) : (
-                <Text style={styles.createButtonText}>Create Site</Text>
-              )}
-            </TouchableOpacity>
+              loading={isSubmitting}
+            />
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -154,19 +148,17 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: colors.homeBg,
+    backgroundColor: colors.bgBase,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.inputBorder,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   headerTitle: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
     flex: 1,
     textAlign: 'center',
   },
@@ -175,53 +167,19 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 32,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
   },
   title: {
-    ...textFont.boldXXXL,
-    color: colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-    marginBottom: 32,
-  },
-  inputLabel: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    marginBottom: 8,
-    letterSpacing: 0.3,
-  },
-  input: {
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: colors.bgSecondary,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    paddingHorizontal: 18,
-    ...textFont.regularM,
-    color: colors.textPrimary,
+    marginBottom: spacing.xxl,
   },
   footer: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    paddingTop: 12,
-  },
-  createButton: {
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createButtonDisabled: {
-    opacity: 0.45,
-  },
-  createButtonText: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.sm,
   },
 });
 

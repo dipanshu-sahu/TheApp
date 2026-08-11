@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -145,7 +145,7 @@ const SwitchDeviceDetail: React.FC<SwitchDeviceDetailProps> = ({
 
         <TouchableOpacity style={styles.bottomBtn} activeOpacity={0.85} disabled>
           <View style={styles.bottomCircle}>
-            <Text style={styles.timerEmoji}>⏰</Text>
+            <Text style={styles.timerEmoji}>⏱</Text>
           </View>
           <Text style={styles.bottomLabel}>Timer</Text>
         </TouchableOpacity>

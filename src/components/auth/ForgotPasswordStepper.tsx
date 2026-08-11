@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import AppText from '../ui/AppText';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { spacing } from '../../themes/spacing';
 import Icon from '../Icon';
 
 const STEPS = ['Email', 'OTP', 'Reset'] as const;
@@ -12,14 +13,13 @@ type ForgotPasswordStepperProps = {
   currentStep: ForgotPasswordStep;
 };
 
-const ForgotPasswordStepper: React.FC<ForgotPasswordStepperProps> = ({
-  currentStep,
-}) => (
+const ForgotPasswordStepper: React.FC<ForgotPasswordStepperProps> = ({ currentStep }) => (
   <View style={styles.wrapper}>
     {STEPS.map((label, index) => {
       const stepNumber = (index + 1) as ForgotPasswordStep;
       const isCompleted = stepNumber < currentStep;
       const isActive = stepNumber === currentStep;
+      const isDone = isActive || isCompleted;
 
       return (
         <React.Fragment key={label}>
@@ -27,41 +27,24 @@ const ForgotPasswordStepper: React.FC<ForgotPasswordStepperProps> = ({
             <View
               style={[
                 styles.circle,
-                isCompleted && styles.circleCompleted,
-                isActive && styles.circleActive,
-                !isCompleted && !isActive && styles.circleInactive,
+                isDone ? styles.circleActive : styles.circleInactive,
               ]}
             >
               {isCompleted ? (
-                <Icon name="check" width={14} height={14} />
+                <Icon name="check" width={14} height={14} color={colors.white} />
               ) : (
-                <Text
-                  style={[
-                    styles.stepNumber,
-                    isActive && styles.stepNumberActive,
-                  ]}
-                >
+                <AppText variant="bodyStrong" color={isActive ? colors.white : colors.textTertiary}>
                   {stepNumber}
-                </Text>
+                </AppText>
               )}
             </View>
-            <Text
-              style={[
-                styles.stepLabel,
-                (isActive || isCompleted) && styles.stepLabelActive,
-              ]}
-            >
+            <AppText variant="caption" color={isDone ? colors.textPrimary : colors.textTertiary}>
               {label}
-            </Text>
+            </AppText>
           </View>
-          {index < STEPS.length - 1 && (
-            <View
-              style={[
-                styles.connector,
-                stepNumber < currentStep && styles.connectorActive,
-              ]}
-            />
-          )}
+          {index < STEPS.length - 1 ? (
+            <View style={[styles.connector, stepNumber < currentStep && styles.connectorActive]} />
+          ) : null}
         </React.Fragment>
       );
     })}
@@ -73,57 +56,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    marginBottom: 28,
-    paddingHorizontal: 8,
+    marginBottom: spacing.xxl,
+    paddingHorizontal: spacing.xs,
   },
   stepItem: {
     alignItems: 'center',
     width: 56,
+    gap: spacing.xxs + 2,
   },
   circle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
-  },
-  circleCompleted: {
-    backgroundColor: colors.secondary,
-    borderWidth: 0,
   },
   circleActive: {
-    backgroundColor: colors.secondary,
-    borderWidth: 0,
+    backgroundColor: colors.primary,
   },
   circleInactive: {
-    backgroundColor: 'transparent',
+    backgroundColor: colors.glass,
     borderWidth: 1.5,
-    borderColor: colors.lineGrey,
-  },
-  stepNumber: {
-    ...textFont.boldS,
-    color: colors.textGrey,
-  },
-  stepNumberActive: {
-    color: colors.textPrimary,
-  },
-  stepLabel: {
-    ...textFont.regularXS,
-    color: colors.textGrey,
-  },
-  stepLabelActive: {
-    color: colors.textPrimary,
+    borderColor: colors.borderStrong,
   },
   connector: {
     width: 40,
     height: 2,
     backgroundColor: colors.lineGrey,
-    marginTop: 15,
-    marginHorizontal: 4,
+    marginTop: 16,
+    marginHorizontal: spacing.xxs,
+    borderRadius: 1,
   },
   connectorActive: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primary,
   },
 });
 

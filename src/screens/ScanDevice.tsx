@@ -1,30 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
+import Animated from 'react-native-reanimated';
 import { MyHomeStackParamList } from '../navigation';
 import WifiManager, { WifiEntry } from 'react-native-wifi-reborn';
-import { request, PERMISSIONS } from 'react-native-permissions';
 import ToastManager, { Toast } from 'toastify-react-native';
 
+import Screen from '../components/ui/Screen';
+import AppText from '../components/ui/AppText';
+import TextField from '../components/ui/TextField';
+import GlassCard from '../components/ui/GlassCard';
+import AnimatedPressable from '../components/ui/AnimatedPressable';
+import { enterUp } from '../components/ui/motion';
 import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
+import { radii } from '../themes/radii';
+import { spacing } from '../themes/spacing';
 import Icon, { IconName } from '../components/Icon';
 import { AppDispatch, RootState } from '../store/store';
 import { selectSite } from '../slices/siteSlice';
 import SiteDropdown from '../components/site/SiteDropdown';
 import CreateSiteModal from '../components/site/CreateSiteModal';
 import ScanRadar from '../components/scan/ScanRadar';
+import { hasLocationPermission } from '../utils/permissions';
 
 type ManualItem = { label: string; icon: IconName };
 
@@ -40,23 +39,22 @@ const MANUAL_CATEGORIES: ManualCategory[] = [
     subtitle: 'Socket',
     items: [
       { label: 'Socket', icon: 'plug' },
-      { label: 'Socket (Gateway)', icon: 'plug' },
-      { label: 'Socket (NB-IoT)', icon: 'plug' },
+      { label: 'Socket (Gateway)', icon: 'mesh' },
+      { label: 'Socket (NB-IoT)', icon: 'wifi' },
     ],
   },
   {
     title: 'LIGHTING',
     items: [
-      { label: 'Smart Bulb', icon: 'intro-lightbulb' },
-      { label: 'LED Strip', icon: 'intro-lightbulb' },
-      { label: 'Switch', icon: 'power-button' },
+      { label: 'Smart Bulb', icon: 'bulb' },
+      { label: 'LED Strip', icon: 'zap' },
+      { label: 'Switch', icon: 'switch' },
     ],
   },
 ];
 
 const ScanDevice = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<MyHomeStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<MyHomeStackParamList>>();
   const route = useRoute<RouteProp<MyHomeStackParamList, 'ScanDevice'>>();
   const dispatch = useDispatch<AppDispatch>();
   const { selectedSite } = useSelector((state: RootState) => state.site);
@@ -84,16 +82,27 @@ const ScanDevice = () => {
   }, []);
 
   useEffect(() => {
-    request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION, {
-      title: 'Location permission is required for WiFi connections',
-      message:
-        'This app needs location permission as this is required ' +
-        'to scan for wifi networks.',
-      buttonNegative: 'DENY',
-      buttonPositive: 'ALLOW',
-    })
-      .then(() => loadWifiList())
-      .catch(() => setIsScanning(false));
+    let cancelled = false;
+    (async () => {
+      const granted = await hasLocationPermission();
+      if (cancelled) {
+        return;
+      }
+      if (granted) {
+        loadWifiList();
+      } else {
+        setIsScanning(false);
+        Toast.show({
+          type: 'error',
+          text1: 'Location required',
+          text2: 'Allow location access to scan for nearby devices.',
+          position: 'top',
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [loadWifiList]);
 
   const filteredCategories = useMemo(() => {
@@ -105,8 +114,7 @@ const ScanDevice = () => {
       ...category,
       items: category.items.filter(
         item =>
-          item.label.toLowerCase().includes(q) ||
-          category.title.toLowerCase().includes(q),
+          item.label.toLowerCase().includes(q) || category.title.toLowerCase().includes(q),
       ),
     })).filter(category => category.items.length > 0);
   }, [categoryQuery]);
@@ -156,15 +164,15 @@ const ScanDevice = () => {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <Screen edges={['top']} padded={false}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12}>
-          <Icon name="arrow-back" width={24} height={24} fill={colors.greyLight} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Device</Text>
-        <TouchableOpacity onPress={loadWifiList} hitSlop={12}>
-          <Icon name="search" width={22} height={22} fill={colors.greyLight} />
-        </TouchableOpacity>
+        <AnimatedPressable onPress={() => navigation.goBack()} pressScale={0.9} style={styles.headerBtn}>
+          <Icon name="arrow-back" width={24} height={24} fill={colors.textSecondary} />
+        </AnimatedPressable>
+        <AppText variant="h3">Add Device</AppText>
+        <AnimatedPressable onPress={loadWifiList} pressScale={0.9} style={styles.headerBtn}>
+          <Icon name="search" width={22} height={22} fill={colors.textSecondary} />
+        </AnimatedPressable>
       </View>
 
       <ScrollView
@@ -172,53 +180,59 @@ const ScanDevice = () => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.siteDropdownWrapper}>
+        <View style={styles.section}>
           <SiteDropdown onAddSite={() => setShowCreateSite(true)} />
         </View>
 
         <View style={styles.scanSection}>
-          <Text style={styles.scanTitle}>
+          <AppText variant="h3" align="center">
             {isScanning ? 'Searching for nearby devices...' : 'Nearby devices'}
-          </Text>
-          <Text style={styles.scanSubtitle}>
-            Make sure the device is powered on and in{' '}
-            <Text style={styles.scanHighlight}>pairing</Text>
-          </Text>
+          </AppText>
+          <AppText variant="bodyLg" color={colors.textSecondary} align="center" style={styles.scanSubtitle}>
+            Make sure the device is powered on and in <AppText variant="bodyLgStrong" color={colors.link}>pairing</AppText>
+          </AppText>
 
           {isScanning ? (
-            <>
+            <GlassCard variant="soft" style={styles.radarPanel}>
               <ScanRadar />
-              <ActivityIndicator color={colors.accent} style={styles.scanLoader} />
-            </>
+              <AppText variant="caption" color={colors.textSecondary} style={styles.radarHint}>
+                Sweeping local Wi‑Fi for pairable hardware
+              </AppText>
+              <ActivityIndicator color={colors.primary} style={styles.scanLoader} />
+            </GlassCard>
           ) : (
             <View style={styles.deviceList}>
               {wifiList.length === 0 ? (
-                <Text style={styles.emptyScan}>
+                <AppText variant="bodyLg" color={colors.textSecondary} align="center" style={styles.emptyScan}>
                   No devices found. Tap refresh or move closer to your device.
-                </Text>
+                </AppText>
               ) : (
-                wifiList.map(item => (
-                  <TouchableOpacity
-                    key={item.BSSID}
-                    style={styles.deviceRow}
-                    onPress={() => handleSelectDevice(item)}
-                  >
-                    <View style={styles.deviceRowLeft}>
-                      <Icon name="plug" width={20} height={20} fill={colors.accent} />
-                      <Text style={styles.deviceName}>{item.SSID}</Text>
-                    </View>
-                    <Icon
-                      name="arrow-next"
-                      width={16}
-                      height={16}
-                      fill={colors.greyLight}
-                    />
-                  </TouchableOpacity>
+                wifiList.map((item, index) => (
+                  <Animated.View key={item.BSSID} entering={enterUp(index, 40)}>
+                    <AnimatedPressable
+                      style={styles.deviceRow}
+                      onPress={() => handleSelectDevice(item)}
+                      pressScale={0.98}
+                      enforceTouchTarget={false}
+                    >
+                      <View style={styles.deviceRowLeft}>
+                        <View style={styles.deviceIcon}>
+                          <Icon name="wifi" width={20} height={20} color={colors.primary} />
+                        </View>
+                        <AppText variant="bodyLg" numberOfLines={1} style={styles.deviceName}>
+                          {item.SSID}
+                        </AppText>
+                      </View>
+                      <Icon name="arrow-next" width={16} height={16} fill={colors.textTertiary} />
+                    </AnimatedPressable>
+                  </Animated.View>
                 ))
               )}
-              <TouchableOpacity style={styles.rescanBtn} onPress={loadWifiList}>
-                <Text style={styles.rescanText}>Scan again</Text>
-              </TouchableOpacity>
+              <AnimatedPressable style={styles.rescanBtn} onPress={loadWifiList} pressScale={0.95}>
+                <AppText variant="bodyLg" color={colors.link}>
+                  Scan again
+                </AppText>
+              </AnimatedPressable>
             </View>
           )}
         </View>
@@ -227,45 +241,42 @@ const ScanDevice = () => {
 
         <View style={styles.manualSection}>
           <View style={styles.manualHeader}>
-            <Text style={styles.manualTitle}>Add Manually</Text>
-            <View style={styles.searchBar}>
-              <Icon name="search" width={16} height={16} fill={colors.textGrey} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search for a category"
-                placeholderTextColor={colors.textGrey}
-                value={categoryQuery}
-                onChangeText={setCategoryQuery}
-              />
-            </View>
+            <AppText variant="h3">Add Manually</AppText>
+            <TextField
+              icon="search"
+              containerStyle={styles.searchField}
+              placeholder="Search"
+              value={categoryQuery}
+              onChangeText={setCategoryQuery}
+            />
           </View>
 
           {filteredCategories.map(category => (
             <View key={category.title} style={styles.categoryBlock}>
-              <Text style={styles.categoryTitle}>{category.title}</Text>
+              <AppText variant="label" color={colors.textTertiary}>
+                {category.title}
+              </AppText>
               {category.subtitle ? (
-                <Text style={styles.categorySubtitle}>{category.subtitle}</Text>
+                <AppText variant="caption" color={colors.textSecondary} style={styles.categorySubtitle}>
+                  {category.subtitle}
+                </AppText>
               ) : null}
               <View style={styles.categoryRow}>
                 {category.items.map(item => (
-                  <TouchableOpacity
+                  <AnimatedPressable
                     key={item.label}
                     style={styles.manualItem}
                     onPress={handleManualSelect}
-                    activeOpacity={0.85}
+                    pressScale={0.92}
+                    enforceTouchTarget={false}
                   >
                     <View style={styles.manualIconBox}>
-                      <Icon
-                        name={item.icon}
-                        width={28}
-                        height={28}
-                        fill={colors.textPrimary}
-                      />
+                      <Icon name={item.icon} width={28} height={28} color={colors.primary} />
                     </View>
-                    <Text style={styles.manualLabel} numberOfLines={2}>
+                    <AppText variant="caption" color={colors.textSecondary} align="center" numberOfLines={2}>
                       {item.label}
-                    </Text>
-                  </TouchableOpacity>
+                    </AppText>
+                  </AnimatedPressable>
                 ))}
               </View>
             </View>
@@ -283,174 +294,140 @@ const ScanDevice = () => {
       />
 
       <ToastManager config={{}} />
-    </SafeAreaView>
+    </Screen>
   );
 };
 
-export default ScanDevice;
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.homeBg,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
-  headerTitle: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
+  headerBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     paddingBottom: 40,
   },
-  siteDropdownWrapper: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
+  section: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
   },
   scanSection: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
     minHeight: 280,
     alignItems: 'center',
   },
-  scanTitle: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
   scanSubtitle: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
   },
-  scanHighlight: {
-    color: colors.link,
+  radarPanel: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  radarHint: {
+    marginTop: spacing.md,
   },
   scanLoader: {
-    marginTop: 16,
+    marginTop: spacing.sm,
   },
   deviceList: {
     width: '100%',
-    marginTop: 20,
+    marginTop: spacing.lg,
   },
   deviceRow: {
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 10,
-    padding: 14,
+    backgroundColor: colors.surfaceCard,
+    borderRadius: radii.lg,
+    padding: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    marginBottom: spacing.sm,
   },
   deviceRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.sm,
     flex: 1,
-    paddingRight: 8,
+    paddingRight: spacing.xs,
+  },
+  deviceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   deviceName: {
-    ...textFont.regularM,
-    color: colors.textPrimary,
     flex: 1,
   },
   emptyScan: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginVertical: 24,
+    marginVertical: spacing.xl,
   },
   rescanBtn: {
     alignSelf: 'center',
-    marginTop: 8,
-    paddingVertical: 8,
-  },
-  rescanText: {
-    ...textFont.regularM,
-    color: colors.link,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   divider: {
-    height: 1,
-    backgroundColor: colors.lineGrey,
-    marginHorizontal: 20,
-    marginVertical: 20,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.lg,
   },
   manualSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.lg,
   },
   manualHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
-    gap: 12,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
-  manualTitle: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-  },
-  searchBar: {
+  searchField: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 8,
-    maxWidth: 220,
-  },
-  searchInput: {
-    flex: 1,
-    ...textFont.regularS,
-    color: colors.textPrimary,
-    padding: 0,
+    maxWidth: 200,
+    marginBottom: 0,
   },
   categoryBlock: {
-    marginBottom: 24,
-  },
-  categoryTitle: {
-    ...textFont.regularS,
-    color: colors.textGrey,
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    marginBottom: spacing.xl,
+    gap: spacing.xxs,
   },
   categorySubtitle: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    marginBottom: 12,
+    marginBottom: spacing.xs,
   },
   categoryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
   manualItem: {
     width: 100,
     alignItems: 'center',
+    gap: spacing.xs,
   },
   manualIconBox: {
     width: 72,
     height: 72,
-    borderRadius: 14,
-    backgroundColor: colors.cardBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceCard,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
-  },
-  manualLabel: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
 });
+
+export default ScanDevice;

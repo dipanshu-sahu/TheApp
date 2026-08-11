@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -7,10 +7,10 @@ import AuthInput from '../components/auth/AuthInput';
 import PasswordStrength from '../components/auth/PasswordStrength';
 import PasswordRequirements from '../components/auth/PasswordRequirements';
 import ForgotPasswordLayout from '../components/auth/ForgotPasswordLayout';
-import GradientButton from '../components/GradientButton';
-import Gap from '../components/Gap';
+import Button from '../components/ui/Button';
+import AppText from '../components/ui/AppText';
 import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
+import { spacing } from '../themes/spacing';
 import { validateField, isFieldValid } from '../utils/validators';
 import { resetPasswordWithOtpApi } from '../apis/userAPI';
 import { extractErrorMessage } from '../utils/extractErrorMessage';
@@ -104,9 +104,9 @@ const ForgotPasswordReset = () => {
       icon="lock-key"
       title="Set New Password"
       description={
-        <Text style={{ ...textFont.regularM, color: colors.textSecondary, lineHeight: 22 }}>
+        <AppText variant="bodyLg" color={colors.textSecondary}>
           Create a strong new password for your account.
-        </Text>
+        </AppText>
       }
     >
       <AuthInput
@@ -142,19 +142,25 @@ const ForgotPasswordReset = () => {
       <PasswordRequirements password={formValues.newPassword} />
 
       {formError ? (
-        <>
-          <Text style={{ ...textFont.regularS, color: colors.error }}>{formError}</Text>
-          <Gap type="s" />
-        </>
+        <AppText variant="body" color={colors.error} style={styles.formError}>
+          {formError}
+        </AppText>
       ) : null}
 
-      <GradientButton
+      <Button
         title="Reset Password"
         onPress={handleReset}
-        isDisable={!isEnabled}
+        disabled={!isEnabled}
+        loading={isSubmitting}
       />
     </ForgotPasswordLayout>
   );
 };
+
+const styles = StyleSheet.create({
+  formError: {
+    marginBottom: spacing.sm,
+  },
+});
 
 export default ForgotPasswordReset;

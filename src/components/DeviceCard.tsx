@@ -1,7 +1,10 @@
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import AppText from './ui/AppText';
+import AnimatedPressable from './ui/AnimatedPressable';
 import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
+import { radii } from '../themes/radii';
+import { spacing } from '../themes/spacing';
 
 type DeviceCardProps = {
   name: string;
@@ -10,44 +13,37 @@ type DeviceCardProps = {
   onPress?: () => void;
 };
 
-const DeviceCard: React.FC<DeviceCardProps> = ({
-  name,
-  location,
-  status,
-  onPress,
-}) => (
-  <TouchableOpacity style={styles.card} onPress={onPress}>
-    <View>
-      <Text style={{ ...textFont.regularM, color: colors.textPrimary }}>
-        {name}
-      </Text>
+const DeviceCard: React.FC<DeviceCardProps> = ({ name, location, status, onPress }) => (
+  <AnimatedPressable style={styles.card} onPress={onPress} pressScale={0.98} enforceTouchTarget={false}>
+    <View style={styles.info}>
+      <AppText variant="bodyLg">{name}</AppText>
       {location ? (
-        <Text style={{ ...textFont.regularXS, color: colors.textSecondary }}>
+        <AppText variant="caption" color={colors.textSecondary}>
           {location}
-        </Text>
+        </AppText>
       ) : null}
     </View>
     {status ? (
-      <View>
-        <Text style={{ ...textFont.regularS, color: colors.warning }}>
-          {status}
-        </Text>
-      </View>
+      <AppText variant="body" color={colors.warning}>
+        {status}
+      </AppText>
     ) : null}
-  </TouchableOpacity>
+  </AnimatedPressable>
 );
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.bgSecondary,
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 10,
+    backgroundColor: colors.surfaceCard,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    marginTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  info: {
+    gap: 2,
+  },
 });
 
 export default DeviceCard;
-

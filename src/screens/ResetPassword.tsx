@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import Animated from 'react-native-reanimated';
 
-import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
-import Gap from '../components/Gap';
-import CustomInput from '../components/CustomInput';
-import ActionButton from '../components/ActionButton';
+import Screen from '../components/ui/Screen';
+import AppText from '../components/ui/AppText';
+import TextField from '../components/ui/TextField';
+import Button from '../components/ui/Button';
 import BackButtonHeader from '../components/BackButtonHeader';
+import { enterUp } from '../components/ui/motion';
+import { colors } from '../themes/colors';
+import { spacing } from '../themes/spacing';
 import { validateField, isFieldValid } from '../utils/validators';
 import { extractErrorMessage } from '../utils/extractErrorMessage';
 import { userResetPasswordApi } from '../apis/userAPI';
@@ -92,14 +94,18 @@ const ResetPassword = () => {
     !isSubmitting;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.body}>
+    <Screen edges={['top']} scroll keyboardAvoiding contentContainerStyle={styles.content}>
+      <Animated.View entering={enterUp(0)}>
         <BackButtonHeader />
-        <Text style={styles.title}>Reset the Password!</Text>
-        <Gap type="s" />
-        <Text style={styles.subtitle}>Please enter your email to reset your password</Text>
-        <Gap type="l" />
-        <CustomInput
+        <AppText variant="h1">Reset the Password!</AppText>
+        <AppText variant="body" color={colors.textSecondary} style={styles.subtitle}>
+          Please enter your email to reset your password
+        </AppText>
+      </Animated.View>
+
+      <Animated.View entering={enterUp(1)} style={styles.form}>
+        <TextField
+          label="Email"
           icon="mail"
           placeholder="Enter Email"
           maxLength={50}
@@ -109,8 +115,8 @@ const ResetPassword = () => {
           autoCapitalize="none"
           errorMessage={errors.email}
         />
-        <Gap type="m" />
-        <CustomInput
+        <TextField
+          label="New Password"
           icon="password-lock"
           placeholder="New Password"
           maxLength={30}
@@ -119,8 +125,8 @@ const ResetPassword = () => {
           onChangeText={value => handleChange('newPassword', value)}
           errorMessage={errors.newPassword}
         />
-        <Gap type="m" />
-        <CustomInput
+        <TextField
+          label="Confirm Password"
           icon="password-lock"
           placeholder="Re-enter New Password"
           maxLength={30}
@@ -129,48 +135,40 @@ const ResetPassword = () => {
           onChangeText={value => handleChange('confirmPassword', value)}
           errorMessage={errors.confirmPassword}
         />
-      </View>
+      </Animated.View>
 
-      <View style={styles.footer}>
+      <Animated.View entering={enterUp(2)} style={styles.footer}>
         {formError ? (
-          <>
-            <Text style={styles.formError}>{formError}</Text>
-            <Gap type="s" />
-          </>
+          <AppText variant="caption" color={colors.error} style={styles.formError}>
+            {formError}
+          </AppText>
         ) : null}
-        <ActionButton
+        <Button
           title="Submit"
           onPress={handleSubmit}
-          isDisable={!isSubmitEnabled}
+          loading={isSubmitting}
+          disabled={!isSubmitEnabled}
         />
-      </View>
-    </SafeAreaView>
+      </Animated.View>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgPrimary,
-  },
-  body: {
-    flex: 1,
-    padding: 16,
-  },
-  title: {
-    ...textFont.boldXL,
-    color: colors.textPrimary,
+  content: {
+    paddingBottom: spacing.xxl,
   },
   subtitle: {
-    ...textFont.boldS,
-    color: colors.textPrimary,
+    marginTop: spacing.xs,
+  },
+  form: {
+    marginTop: spacing.xl,
   },
   footer: {
-    padding: 16,
+    marginTop: spacing.sm,
   },
   formError: {
-    ...textFont.regularS,
-    color: colors.error,
+    marginBottom: spacing.sm,
   },
 });
 

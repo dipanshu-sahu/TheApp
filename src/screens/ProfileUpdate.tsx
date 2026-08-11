@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
+import Animated from 'react-native-reanimated';
 
-import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
-import Gap from '../components/Gap';
-import CustomInput from '../components/CustomInput';
-import ActionButton from '../components/ActionButton';
+import Screen from '../components/ui/Screen';
+import AppText from '../components/ui/AppText';
+import TextField from '../components/ui/TextField';
+import Button from '../components/ui/Button';
 import BackButtonHeader from '../components/BackButtonHeader';
+import { enterUp } from '../components/ui/motion';
+import { colors } from '../themes/colors';
+import { spacing } from '../themes/spacing';
 import { AppDispatch, RootState } from '../store/store';
 import { fetchUsers, updateUserProfile } from '../slices/userSlice';
 import { userUpdateProfileRequest } from '../types/user';
-import { isFieldValid, validateField } from '../utils/validators';
+import { validateField } from '../utils/validators';
 import { extractErrorMessage } from '../utils/extractErrorMessage';
 
 const ProfileUpdate = () => {
@@ -107,14 +109,18 @@ const ProfileUpdate = () => {
     !isSubmitting;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.body}>
+    <Screen edges={['top']} scroll keyboardAvoiding contentContainerStyle={styles.content}>
+      <Animated.View entering={enterUp(0)}>
         <BackButtonHeader />
-        <Text style={styles.title}>Update Profile</Text>
-        <Gap type="s" />
-        <Text style={styles.subtitle}>Modify your personal information below.</Text>
-        <Gap type="l" />
-        <CustomInput
+        <AppText variant="h1">Update Profile</AppText>
+        <AppText variant="body" color={colors.textSecondary} style={styles.subtitle}>
+          Modify your personal information below.
+        </AppText>
+      </Animated.View>
+
+      <Animated.View entering={enterUp(1)} style={styles.form}>
+        <TextField
+          label="First Name"
           icon="profile"
           placeholder="First Name"
           maxLength={30}
@@ -123,8 +129,8 @@ const ProfileUpdate = () => {
           errorMessage={errors.firstName}
           autoCapitalize="words"
         />
-        <Gap type="m" />
-        <CustomInput
+        <TextField
+          label="Last Name"
           icon="profile"
           placeholder="Last Name"
           maxLength={30}
@@ -133,9 +139,9 @@ const ProfileUpdate = () => {
           errorMessage={errors.lastName}
           autoCapitalize="words"
         />
-        <Gap type="m" />
-        <CustomInput
-          icon="profile"
+        <TextField
+          label="Phone Number"
+          icon="phone"
           placeholder="Phone Number"
           maxLength={15}
           value={formValues.phoneNumber}
@@ -143,8 +149,8 @@ const ProfileUpdate = () => {
           errorMessage={errors.phoneNumber}
           keyboardType="phone-pad"
         />
-        <Gap type="m" />
-        <CustomInput
+        <TextField
+          label="User Type"
           icon="profile"
           placeholder="User Type"
           maxLength={30}
@@ -152,48 +158,40 @@ const ProfileUpdate = () => {
           onChangeText={value => handleChange('type', value)}
           errorMessage={errors.type}
         />
-      </View>
+      </Animated.View>
 
-      <View style={styles.footer}>
+      <Animated.View entering={enterUp(2)} style={styles.footer}>
         {formError || updateProfileApi.error ? (
-          <>
-            <Text style={styles.formError}>{formError || updateProfileApi.error}</Text>
-            <Gap type="s" />
-          </>
+          <AppText variant="caption" color={colors.error} style={styles.formError}>
+            {formError || updateProfileApi.error}
+          </AppText>
         ) : null}
-        <ActionButton
+        <Button
           title={isSubmitting ? 'Updating...' : 'Update Profile'}
           onPress={handleSubmit}
-          isDisable={!isSubmitEnabled}
+          loading={isSubmitting}
+          disabled={!isSubmitEnabled}
         />
-      </View>
-    </SafeAreaView>
+      </Animated.View>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgPrimary,
-  },
-  body: {
-    flex: 1,
-    padding: 16,
-  },
-  title: {
-    ...textFont.boldXL,
-    color: colors.textPrimary,
+  content: {
+    paddingBottom: spacing.xxl,
   },
   subtitle: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  form: {
+    marginTop: spacing.xl,
   },
   footer: {
-    padding: 16,
+    marginTop: spacing.sm,
   },
   formError: {
-    ...textFont.regularS,
-    color: colors.error,
+    marginBottom: spacing.sm,
   },
 });
 

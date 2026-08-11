@@ -1,63 +1,85 @@
-export type userLoginRequest = {
-  email: string;
-  password: string;
+export type UserLoginRequest = {
+  readonly email: string;
+  readonly password: string;
 };
 
-export type userLoginResponse = {
-  message: string;
-  token: string;
+export type UserLoginResponse = {
+  readonly message: string;
+  readonly token: string;
 };
 
 export type UserInfo = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber?: string;
-  userType?: string;
+  readonly id: string;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly email: string;
+  readonly phoneNumber?: string;
+  readonly userType?: string;
 };
 
-export type userUpdateProfileRequest = {
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-  type: string;
+export type UserUpdateProfileRequest = {
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly phoneNumber: string;
+  readonly type: string;
 };
 
-export type userRegisterRequest = {
-  firstName: string;
-  lastName: string;
-  type: string;
-  email: string;
-  phoneNumber: string;
-  password: string;
-  confirmPassword: string;
+export type UserRegisterRequest = {
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly type: string;
+  readonly email: string;
+  readonly phoneNumber: string;
+  readonly password: string;
+  readonly confirmPassword: string;
 };
 
-export type userResetPasswordRequest = {
-  email: string;
-  newPassword: string;
-  confirmPassword: string;
+export type UserResetPasswordRequest = {
+  readonly email: string;
+  readonly newPassword: string;
+  readonly confirmPassword: string;
 };
 
-export type forgotPasswordOtpRequest = {
-  email: string;
+export type ForgotPasswordOtpRequest = {
+  readonly email: string;
 };
 
-export type verifyForgotPasswordOtpRequest = {
-  email: string;
-  otp: string;
+export type VerifyForgotPasswordOtpRequest = {
+  readonly email: string;
+  readonly otp: string;
 };
 
-export type resetPasswordWithOtpRequest = {
-  email: string;
-  otp: string;
-  newPassword: string;
-  confirmPassword: string;
+export type ResetPasswordWithOtpRequest = {
+  readonly email: string;
+  readonly otp: string;
+  readonly newPassword: string;
+  readonly confirmPassword: string;
 };
 
-export type userChangePasswordRequest = {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
+export type UserChangePasswordRequest = {
+  readonly currentPassword: string;
+  readonly newPassword: string;
+  readonly confirmPassword: string;
 };
+
+// ---------------------------------------------------------------------------
+// Legacy camelCase aliases — kept for zero-churn migration; prefer PascalCase
+// ---------------------------------------------------------------------------
+/** @deprecated Use {@link UserLoginRequest} */
+export type userLoginRequest = UserLoginRequest;
+/** @deprecated Use {@link UserLoginResponse} */
+export type userLoginResponse = UserLoginResponse;
+/** @deprecated Use {@link UserUpdateProfileRequest} */
+export type userUpdateProfileRequest = UserUpdateProfileRequest;
+/** @deprecated Use {@link UserRegisterRequest} */
+export type userRegisterRequest = UserRegisterRequest;
+/** @deprecated Use {@link UserResetPasswordRequest} */
+export type userResetPasswordRequest = UserResetPasswordRequest;
+/** @deprecated Use {@link ForgotPasswordOtpRequest} */
+export type forgotPasswordOtpRequest = ForgotPasswordOtpRequest;
+/** @deprecated Use {@link VerifyForgotPasswordOtpRequest} */
+export type verifyForgotPasswordOtpRequest = VerifyForgotPasswordOtpRequest;
+/** @deprecated Use {@link ResetPasswordWithOtpRequest} */
+export type resetPasswordWithOtpRequest = ResetPasswordWithOtpRequest;
+/** @deprecated Use {@link UserChangePasswordRequest} */
+export type userChangePasswordRequest = UserChangePasswordRequest;

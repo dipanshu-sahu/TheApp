@@ -1,8 +1,10 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import AppText from '../ui/AppText';
 import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { spacing } from '../../themes/spacing';
 import Icon from '../Icon';
 
 type AuthBackLinkProps = {
@@ -25,10 +27,12 @@ const AuthBackLink: React.FC<AuthBackLinkProps> = ({
   };
 
   return (
-    <TouchableOpacity style={styles.wrapper} onPress={handlePress}>
+    <AnimatedPressable style={styles.wrapper} onPress={handlePress} pressScale={0.95}>
       <Icon name="arrow-back" width={18} height={18} fill={colors.textSecondary} />
-      <Text style={styles.label}>{label}</Text>
-    </TouchableOpacity>
+      <AppText variant="bodyLg" color={colors.textSecondary}>
+        {label}
+      </AppText>
+    </AnimatedPressable>
   );
 };
 
@@ -36,12 +40,9 @@ const styles = StyleSheet.create({
   wrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 24,
-  },
-  label: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
+    gap: spacing.xs,
+    marginBottom: spacing.xl,
+    alignSelf: 'flex-start',
   },
 });
 

@@ -1,39 +1,40 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import Icon from '../Icon';
-import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import AppText from '../ui/AppText';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import { colors, withAlpha } from '../../themes/colors';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
 import { DEVICE_CATEGORIES } from '../../utils/deviceDisplay';
 
 const CategorySection: React.FC = () => (
   <View style={styles.wrapper}>
     <View style={styles.header}>
-      <Text style={styles.title}>Add by Category</Text>
-      <TouchableOpacity>
-        <Text style={styles.seeAll}>See All &gt;</Text>
-      </TouchableOpacity>
+      <AppText variant="h3">Add by Category</AppText>
+      <AnimatedPressable pressScale={0.95} enforceTouchTarget={false}>
+        <AppText variant="body" color={colors.link}>
+          See All &gt;
+        </AppText>
+      </AnimatedPressable>
     </View>
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}
-    >
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
       {DEVICE_CATEGORIES.map(category => (
-        <TouchableOpacity key={category.id} style={styles.item} activeOpacity={0.85}>
-          <View
-            style={[styles.iconBox, { backgroundColor: `${category.tint}22` }]}
-          >
+        <AnimatedPressable key={category.id} style={styles.item} pressScale={0.92} enforceTouchTarget={false}>
+          <View style={[styles.iconBox, { backgroundColor: withAlpha(category.tint, 0.14), borderColor: withAlpha(category.tint, 0.3) }]}>
             <Icon
               name={category.icon}
-              width={22}
-              height={22}
+              width={24}
+              height={24}
               color={category.tint}
               fill={category.tint}
               stroke={category.tint}
             />
           </View>
-          <Text style={styles.label}>{category.label}</Text>
-        </TouchableOpacity>
+          <AppText variant="caption" color={colors.textSecondary} align="center">
+            {category.label}
+          </AppText>
+        </AnimatedPressable>
       ))}
     </ScrollView>
   </View>
@@ -41,45 +42,30 @@ const CategorySection: React.FC = () => (
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 28,
+    marginBottom: spacing.xl,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
-  },
-  title: {
-    ...textFont.boldL,
-    color: colors.textPrimary,
-  },
-  seeAll: {
-    ...textFont.regularS,
-    color: colors.link,
+    marginBottom: spacing.md,
   },
   row: {
-    gap: 12,
-    paddingRight: 4,
+    gap: spacing.sm,
+    paddingRight: spacing.xxs,
   },
   item: {
     width: 76,
     alignItems: 'center',
+    gap: spacing.xs,
   },
   iconBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: colors.cardBackground,
+    width: 60,
+    height: 60,
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.inputBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  label: {
-    ...textFont.regularS,
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
 });
 

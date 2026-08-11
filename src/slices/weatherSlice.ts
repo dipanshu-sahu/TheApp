@@ -5,6 +5,15 @@ import { WeatherState } from '../types/weather';
 import { getCurrentCoordinates, formatReverseGeocodeLabel } from '../utils/location';
 import { getWeatherConditionLabel } from '../utils/weatherDisplay';
 
+/**
+ * Subset of `WeatherState` that the thunk resolves with.
+ * Typed explicitly so the fulfilled reducer can assign without casting.
+ */
+type WeatherPayload = Pick<
+  WeatherState,
+  'latitude' | 'longitude' | 'locationLabel' | 'temperature' | 'weatherCode' | 'condition'
+>;
+
 const initialState: WeatherState = {
   latitude: null,
   longitude: null,
@@ -16,9 +25,9 @@ const initialState: WeatherState = {
   error: null,
 };
 
-export const fetchWeatherWithLocation = createAsyncThunk(
+export const fetchWeatherWithLocation = createAsyncThunk<WeatherPayload, void>(
   'weather/fetchWeatherWithLocation',
-  async () => {
+  async (): Promise<WeatherPayload> => {
     const { latitude, longitude } = await getCurrentCoordinates();
 
     const [forecast, geocode] = await Promise.all([
@@ -64,7 +73,7 @@ export const weatherSlice = createSlice({
       })
       .addCase(fetchWeatherWithLocation.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.error.message || 'Failed to load weather';
+        state.error = action.error.message ?? 'Failed to load weather';
         state.locationLabel = 'Weather unavailable';
       });
   },

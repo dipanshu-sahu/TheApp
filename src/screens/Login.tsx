@@ -1,23 +1,19 @@
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
+import Animated from 'react-native-reanimated';
 
-import { colors } from '../themes/colors';
-import { textFont } from '../utils/textFont';
-import Gap from '../components/Gap';
-import GradientButton from '../components/GradientButton';
+import Screen from '../components/ui/Screen';
+import AppText from '../components/ui/AppText';
+import Button from '../components/ui/Button';
+import AnimatedPressable from '../components/ui/AnimatedPressable';
+import GlassCard from '../components/ui/GlassCard';
+import { enterFade, enterUp } from '../components/ui/motion';
 import AuthHeader from '../components/auth/AuthHeader';
 import AuthInput from '../components/auth/AuthInput';
+import { colors } from '../themes/colors';
+import { spacing } from '../themes/spacing';
 import { userLogin } from '../slices/userSlice';
 import { AppDispatch } from '../store/store';
 import { userLoginRequest } from '../types/user';
@@ -48,7 +44,6 @@ const Login = () => {
       email: validateField('email', email),
       password: validateField('password', password),
     };
-
     setErrors(validationErrors);
     return !validationErrors.email && !validationErrors.password;
   };
@@ -57,10 +52,8 @@ const Login = () => {
     if (isSubmitting) {
       return;
     }
-
     setFormError('');
-    const isValid = validateFields();
-    if (!isValid) {
+    if (!validateFields()) {
       return;
     }
 
@@ -79,32 +72,25 @@ const Login = () => {
     }
   };
 
-  const isEnabled = () =>
-    isFieldValid('email', email) &&
-    isFieldValid('password', password) &&
-    !isSubmitting;
+  const isEnabled =
+    isFieldValid('email', email) && isFieldValid('password', password) && !isSubmitting;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <AuthHeader
-            variant="login"
-            title="Welcome Back 👋"
-            subtitle="Sign in to control your smart home"
-          />
+    <Screen scroll keyboardAvoiding edges={['top', 'bottom']} contentContainerStyle={styles.scroll}>
+      <Animated.View entering={enterFade(0)}>
+        <AuthHeader
+          variant="login"
+          title="Welcome Back"
+          subtitle="Sign in to control your smart home"
+        />
+      </Animated.View>
 
+      <Animated.View entering={enterUp(1)}>
+        <GlassCard variant="soft" sheen={false} style={styles.formCard}>
           <AuthInput
             label="Email Address"
             icon="mail"
-            placeholder="rahul@example.com"
+            placeholder="you@example.com"
             maxLength={50}
             value={email}
             onChangeText={value => {
@@ -130,81 +116,68 @@ const Login = () => {
             errorMessage={errors.password}
           />
 
-          <TouchableOpacity
+          <AnimatedPressable
             style={styles.forgotPassword}
+            pressScale={0.98}
             onPress={() => navigation.navigate('ForgotPassword' as never)}
           >
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
+            <AppText variant="bodyStrong" color={colors.link}>
+              Forgot Password?
+            </AppText>
+          </AnimatedPressable>
 
           {formError ? (
-            <>
-              <Text style={styles.formError}>{formError}</Text>
-              <Gap type="s" />
-            </>
+            <AppText variant="body" color={colors.error} style={styles.formError}>
+              {formError}
+            </AppText>
           ) : null}
 
-          <GradientButton
+          <Button
             title="Sign In"
             onPress={handleLogin}
-            isDisable={!isEnabled()}
-            tone="primary"
+            disabled={!isEnabled}
+            loading={isSubmitting}
+            rightIcon="arrow-next"
           />
+        </GlassCard>
+      </Animated.View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don&apos;t have an account? </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('SignUp' as never)}
-            >
-              <Text style={styles.footerLink}>Sign Up</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      <Animated.View entering={enterUp(2)} style={styles.footer}>
+        <AppText variant="bodyLg" color={colors.textSecondary}>
+          Don&apos;t have an account?{' '}
+        </AppText>
+        <AnimatedPressable pressScale={0.98} onPress={() => navigation.navigate('SignUp' as never)}>
+          <AppText variant="bodyLgStrong" color={colors.link}>
+            Sign Up
+          </AppText>
+        </AnimatedPressable>
+      </Animated.View>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bgPrimary,
-  },
-  flex: {
-    flex: 1,
-  },
-  scrollContent: {
+  scroll: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 32,
+    justifyContent: 'center',
+    paddingBottom: spacing.xxl,
+  },
+  formCard: {
+    padding: spacing.lg,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginTop: -6,
-    marginBottom: 24,
-  },
-  forgotPasswordText: {
-    ...textFont.regularM,
-    color: colors.link,
+    marginBottom: spacing.lg,
+    marginTop: -spacing.xs,
   },
   formError: {
-    ...textFont.regularS,
-    color: colors.error,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
-  },
-  footerText: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-  },
-  footerLink: {
-    ...textFont.boldM,
-    color: colors.link,
+    alignItems: 'center',
+    marginTop: spacing.xl,
   },
 });
 

@@ -1,8 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { textFont } from '../utils/textFont';
-import { colors } from '../themes/colors';
-import GradientButton from './GradientButton';
+import Button from './ui/Button';
 
 interface ActionButtonProps {
   title: string;
@@ -13,42 +10,19 @@ interface ActionButtonProps {
   variant?: 'gradient' | 'solid';
 }
 
+/** Legacy action button API, now backed by the shared Button primitive. */
 const ActionButton: React.FC<ActionButtonProps> = ({
   title,
-  bgColor = colors.secondary,
-  textColor = colors.textPrimary,
   onPress,
   isDisable,
   variant = 'gradient',
-}) => {
-  if (variant === 'gradient') {
-    return (
-      <GradientButton title={title} onPress={onPress} isDisable={isDisable} />
-    );
-  }
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        { backgroundColor: isDisable ? colors.lineGrey : bgColor },
-      ]}
-      onPress={onPress}
-      disabled={isDisable}
-    >
-      <Text style={{ ...textFont.regularS, color: textColor }}>{title}</Text>
-    </TouchableOpacity>
-  );
-};
-
-const styles = StyleSheet.create({
-  button: {
-    padding: 12,
-    borderRadius: 24,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+}) => (
+  <Button
+    title={title}
+    onPress={onPress}
+    disabled={isDisable}
+    variant={variant === 'gradient' ? 'primary' : 'outline'}
+  />
+);
 
 export default ActionButton;

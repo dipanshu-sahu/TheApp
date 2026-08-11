@@ -1,20 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { Modal, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AppText from '../ui/AppText';
+import Button from '../ui/Button';
+import TextField from '../ui/TextField';
+import GlassCard from '../ui/GlassCard';
+import AnimatedPressable from '../ui/AnimatedPressable';
+import AmbientBackground from '../ui/AmbientBackground';
 import Icon from '../Icon';
-import { colors } from '../../themes/colors';
-import { textFont } from '../../utils/textFont';
+import { colors, withAlpha } from '../../themes/colors';
+import { radii } from '../../themes/radii';
+import { spacing } from '../../themes/spacing';
 
 type DeviceRoleOption = {
   role: number;
@@ -34,20 +31,42 @@ type AreaSelectionModalProps = {
   onConfirm: (payload: { meshId: string; deviceRole: number }) => void;
 };
 
-const AreaSelectionModal: React.FC<AreaSelectionModalProps> = ({
-  visible,
-  onClose,
-  onConfirm,
-}) => {
+const RoleChip: React.FC<{
+  label: string;
+  description: string;
+  selected: boolean;
+  disabled?: boolean;
+  onPress?: () => void;
+}> = ({ label, description, selected, disabled, onPress }) => (
+  <AnimatedPressable
+    style={[
+      styles.chip,
+      selected && styles.chipSelected,
+      disabled && styles.chipDisabled,
+    ]}
+    onPress={onPress}
+    disabled={disabled}
+    pressScale={0.97}
+    enforceTouchTarget={false}
+  >
+    <AppText variant="bodyStrong" color={selected ? colors.primary : colors.textPrimary}>
+      {label}
+    </AppText>
+    <AppText variant="caption" color={selected ? colors.primary : colors.textTertiary}>
+      {description}
+    </AppText>
+  </AnimatedPressable>
+);
+
+const AreaSelectionModal: React.FC<AreaSelectionModalProps> = ({ visible, onClose, onConfirm }) => {
   const [meshId, setMeshId] = useState('');
   const [deviceRole, setDeviceRole] = useState<number>(1);
 
-  // Auto-adjust role when meshId changes
   useEffect(() => {
-    const hasMesh = meshId.trim().length > 0;
-    if (hasMesh && deviceRole === 1) {
+    const hasMeshValue = meshId.trim().length > 0;
+    if (hasMeshValue && deviceRole === 1) {
       setDeviceRole(2);
-    } else if (!hasMesh) {
+    } else if (!hasMeshValue) {
       setDeviceRole(1);
     }
   }, [meshId, deviceRole]);
@@ -70,21 +89,17 @@ const AreaSelectionModal: React.FC<AreaSelectionModalProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="fullScreen"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={handleClose}>
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <AmbientBackground />
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} hitSlop={12}>
-              <Icon name="close" width={22} height={22} fill={colors.greyLight} />
-            </TouchableOpacity>
+            <AnimatedPressable onPress={handleClose} pressScale={0.9} style={styles.closeBtn}>
+              <Icon name="close" width={22} height={22} color={colors.textSecondary} />
+            </AnimatedPressable>
           </View>
 
           <ScrollView
@@ -92,84 +107,61 @@ const AreaSelectionModal: React.FC<AreaSelectionModalProps> = ({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Mesh Selection */}
-            <Text style={styles.title}>Installing Location</Text>
-            <Text style={styles.subtitle}>
+            <AppText variant="h1" style={styles.title}>
+              Installing Location
+            </AppText>
+            <AppText variant="bodyLg" color={colors.textSecondary} style={styles.subtitle}>
               Select or enter a mesh ID for this device
-            </Text>
+            </AppText>
 
-            <TextInput
-              style={styles.meshInput}
-              placeholder="e.g. living-room-mesh-01"
-              placeholderTextColor={colors.textGrey}
-              value={meshId}
-              onChangeText={setMeshId}
-              returnKeyType="done"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <GlassCard variant="soft" sheen={false} style={styles.formCard}>
+              <TextField
+                icon="map"
+                label="Mesh ID"
+                placeholder="e.g. living-room-mesh-01"
+                value={meshId}
+                onChangeText={setMeshId}
+                returnKeyType="done"
+                autoCapitalize="none"
+                autoCorrect={false}
+                hint={
+                  <AppText variant="caption" color={colors.textTertiary} style={styles.helperText}>
+                    Leave empty to install as an independent device
+                  </AppText>
+                }
+              />
 
-            <Text style={styles.helperText}>
-              Leave empty to install as an independent device
-            </Text>
+              <AppText variant="title" style={styles.sectionTitle}>
+                Device Role
+              </AppText>
 
-            {/* Device Role Selection */}
-            <Text style={styles.sectionTitle}>Device Role</Text>
-
-            {hasMesh ? (
-              <View style={styles.chipRow}>
-                {ROLE_OPTIONS.map(option => {
-                  const isSelected = deviceRole === option.role;
-                  return (
-                    <TouchableOpacity
+              {hasMesh ? (
+                <View style={styles.chipRow}>
+                  {ROLE_OPTIONS.map(option => (
+                    <RoleChip
                       key={option.role}
-                      style={[styles.chip, isSelected && styles.chipSelected]}
+                      label={option.label}
+                      description={option.description}
+                      selected={deviceRole === option.role}
                       onPress={() => setDeviceRole(option.role)}
-                      activeOpacity={0.85}
-                    >
-                      <Text
-                        style={[
-                          styles.chipLabel,
-                          isSelected && styles.chipLabelSelected,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.chipDescription,
-                          isSelected && styles.chipDescriptionSelected,
-                        ]}
-                      >
-                        {option.description}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={styles.chipRow}>
-                <View style={[styles.chip, styles.chipSelected, styles.chipDisabled]}>
-                  <Text style={[styles.chipLabel, styles.chipLabelSelected]}>
-                    Independent
-                  </Text>
-                  <Text style={[styles.chipDescription, styles.chipDescriptionSelected]}>
-                    Standalone device, no mesh
-                  </Text>
+                    />
+                  ))}
                 </View>
-              </View>
-            )}
+              ) : (
+                <View style={styles.chipRow}>
+                  <RoleChip
+                    label="Independent"
+                    description="Standalone device, no mesh"
+                    selected
+                    disabled
+                  />
+                </View>
+              )}
+            </GlassCard>
           </ScrollView>
 
           <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.continueButton}
-              onPress={handleConfirm}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.continueButtonText}>Continue</Text>
-              <Icon name="arrow-next" width={18} height={18} fill={colors.textPrimary} />
-            </TouchableOpacity>
+            <Button title="Continue" rightIcon="arrow-next" onPress={handleConfirm} />
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -183,106 +175,67 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: colors.homeBg,
+    backgroundColor: colors.bgBase,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xxs,
     alignItems: 'flex-start',
   },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   title: {
-    ...textFont.boldXXXL,
-    color: colors.textPrimary,
-    fontSize: 34,
-    lineHeight: 40,
-    marginTop: 8,
+    marginTop: spacing.xs,
   },
   subtitle: {
-    ...textFont.regularM,
-    color: colors.textSecondary,
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xl,
   },
-  meshInput: {
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: colors.bgSecondary,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    paddingHorizontal: 18,
-    ...textFont.regularM,
-    color: colors.textPrimary,
-    marginBottom: 10,
+  formCard: {
+    padding: spacing.lg,
   },
   helperText: {
-    ...textFont.regularS,
-    color: colors.textGrey,
-    marginBottom: 32,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.sm,
   },
   chip: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    backgroundColor: colors.bgSecondary,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceSubtle,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     minWidth: '45%',
     flex: 1,
+    gap: spacing.xxs,
   },
   chipSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: withAlpha(colors.primary, 0.18),
   },
   chipDisabled: {
-    opacity: 0.75,
-  },
-  chipLabel: {
-    ...textFont.boldM,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  chipLabelSelected: {
-    color: colors.textPrimary,
-  },
-  chipDescription: {
-    ...textFont.regularS,
-    color: colors.textGrey,
-  },
-  chipDescriptionSelected: {
-    color: `${colors.textPrimary}CC`,
+    opacity: 0.95,
   },
   footer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  continueButton: {
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  continueButtonText: {
-    ...textFont.boldM,
-    color: colors.textPrimary,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
 });
 

@@ -22,7 +22,7 @@ const phoneRegex = /^\+?[0-9]{7,15}$/;
 
 type ValidatorFn = (value: string, context?: ValidationContext) => string;
 
-const passwordValidator: ValidatorFn = value => {
+const passwordValidator: ValidatorFn = (value): string => {
   if (!value) {
     return 'Password is required';
   }
@@ -35,9 +35,9 @@ const passwordValidator: ValidatorFn = value => {
   return '';
 };
 
-const validators: Record<ValidationField, ValidatorFn> = {
-  email: value => {
-    const trimmedValue = value?.trim?.() ?? '';
+const validators: Readonly<Record<ValidationField, ValidatorFn>> = {
+  email: (value): string => {
+    const trimmedValue = value?.trim() ?? '';
     if (!trimmedValue) {
       return 'Email is required';
     }
@@ -49,8 +49,8 @@ const validators: Record<ValidationField, ValidatorFn> = {
   password: passwordValidator,
   currentPassword: passwordValidator,
   newPassword: passwordValidator,
-  firstName: value => {
-    const trimmedValue = value?.trim?.() ?? '';
+  firstName: (value): string => {
+    const trimmedValue = value?.trim() ?? '';
     if (!trimmedValue) {
       return 'First name is required';
     }
@@ -59,8 +59,8 @@ const validators: Record<ValidationField, ValidatorFn> = {
     }
     return '';
   },
-  lastName: value => {
-    const trimmedValue = value?.trim?.() ?? '';
+  lastName: (value): string => {
+    const trimmedValue = value?.trim() ?? '';
     if (!trimmedValue) {
       return 'Last name is required';
     }
@@ -69,8 +69,8 @@ const validators: Record<ValidationField, ValidatorFn> = {
     }
     return '';
   },
-  fullName: value => {
-    const trimmedValue = value?.trim?.() ?? '';
+  fullName: (value): string => {
+    const trimmedValue = value?.trim() ?? '';
     if (!trimmedValue) {
       return 'Full name is required';
     }
@@ -83,8 +83,8 @@ const validators: Record<ValidationField, ValidatorFn> = {
     }
     return '';
   },
-  phoneNumber: value => {
-    const trimmedValue = value?.trim?.() ?? '';
+  phoneNumber: (value): string => {
+    const trimmedValue = value?.trim() ?? '';
     if (!trimmedValue) {
       return 'Phone number is required';
     }
@@ -93,8 +93,8 @@ const validators: Record<ValidationField, ValidatorFn> = {
     }
     return '';
   },
-  type: value => {
-    const trimmedValue = value?.trim?.() ?? '';
+  type: (value): string => {
+    const trimmedValue = value?.trim() ?? '';
     if (!trimmedValue) {
       return 'User type is required';
     }
@@ -103,7 +103,7 @@ const validators: Record<ValidationField, ValidatorFn> = {
     }
     return '';
   },
-  confirmPassword: (value, context) => {
+  confirmPassword: (value, context): string => {
     if (!value) {
       return 'Confirm password is required';
     }
@@ -112,8 +112,8 @@ const validators: Record<ValidationField, ValidatorFn> = {
     }
     return '';
   },
-  otp: value => {
-    const trimmedValue = value?.trim?.() ?? '';
+  otp: (value): string => {
+    const trimmedValue = value?.trim() ?? '';
     if (!trimmedValue) {
       return 'Verification code is required';
     }
@@ -128,22 +128,17 @@ export const validateField = (
   field: ValidationField,
   value: string,
   context: ValidationContext = {},
-) => {
-  return validators[field](value, context);
-};
+): string => validators[field](value, context);
 
 export const isFieldValid = (
   field: ValidationField,
   value: string,
   context: ValidationContext = {},
-) => {
-  return validateField(field, value, context) === '';
-};
+): boolean => validateField(field, value, context) === '';
 
 export const regexCollection = {
   email: emailRegex,
   password: passwordRegex,
   name: nameRegex,
   phone: phoneRegex,
-};
-
+} as const;
