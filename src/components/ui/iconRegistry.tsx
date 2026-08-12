@@ -401,6 +401,21 @@ export const iconRegistry: Partial<Record<IconName, IconRenderer>> = {
       <Circle cx={15.5} cy={12} r={2.5} fill={c} stroke="none" />
     </>
   ),
+  curtain: (c, sw) => (
+    <>
+      <Line x1={3} y1={4} x2={21} y2={4} stroke={c} strokeWidth={sw} strokeLinecap="round" />
+      <Path d="M7 4c0 6.5-1.2 11-3 16h4c1.4-5 2-9.6 2-16" stroke={c} strokeWidth={sw} strokeLinejoin="round" />
+      <Path d="M17 4c0 6.5 1.2 11 3 16h-4c-1.4-5-2-9.6-2-16" stroke={c} strokeWidth={sw} strokeLinejoin="round" />
+    </>
+  ),
+  dimmer: (c, sw) => (
+    <>
+      <Circle cx={12} cy={12} r={7.5} stroke={c} strokeWidth={sw} />
+      <Line x1={12} y1={12} x2={12} y2={6.5} stroke={c} strokeWidth={sw} strokeLinecap="round" />
+      <Line x1={4.5} y1={19.5} x2={6} y2={18} stroke={c} strokeWidth={sw} strokeLinecap="round" />
+      <Line x1={19.5} y1={19.5} x2={18} y2={18} stroke={c} strokeWidth={sw} strokeLinecap="round" />
+    </>
+  ),
   mesh: (c, sw) => (
     <>
       <Circle cx={12} cy={5} r={2} stroke={c} strokeWidth={sw} />

@@ -65,6 +65,8 @@ export const iconNames = [
   'plug',
   'socket',
   'switch',
+  'curtain',
+  'dimmer',
   'mesh',
   // Legacy illustration aliases (rendered as clean vectors)
   'intro-rings',

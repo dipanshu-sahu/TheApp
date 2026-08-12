@@ -16,7 +16,12 @@ import { spacing } from '../themes/spacing';
 import { AppDispatch, RootState } from '../store/store';
 import { fetchDevices } from '../slices/deviceSlice';
 import HomeDeviceCard from '../components/home/HomeDeviceCard';
-import { getDeviceIcon, getDeviceStatusLabel, getDeviceTint, isDeviceOnline } from '../utils/deviceDisplay';
+import {
+  getDeviceIconForDevice,
+  getDeviceStatusLabel,
+  getDeviceTint,
+  isDeviceOnline,
+} from '../utils/deviceDisplay';
 import { DeviceInfo } from '../types/device';
 import { MyHomeStackParamList } from '../navigation';
 
@@ -130,7 +135,7 @@ const Devices: React.FC = () => {
         >
           {pair.map((device, colIndex) => {
             const isOn = toggleState[device.id] ?? isDeviceOnline(device);
-            const icon = getDeviceIcon(device.name);
+            const icon = getDeviceIconForDevice(device);
             return (
               <View key={device.id} style={styles.col}>
                 <HomeDeviceCard

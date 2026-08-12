@@ -1,6 +1,7 @@
 import { IconName } from '../types/icons';
 import { DEVICE_TYPE_SMART_SWITCH, DeviceInfo } from '../types/device';
 import { colors } from '../themes/colors';
+import { ChannelKind, resolveDeviceProfile } from './jacobianCode';
 
 export type DeviceCategory = 'lighting' | 'climate' | 'security' | 'plugs';
 
@@ -62,15 +63,45 @@ export const getDeviceIcon = (name: string): IconName => {
   return 'bulb';
 };
 
+const ICON_BY_CHANNEL_KIND: Readonly<Record<ChannelKind, IconName>> = {
+  switch: 'switch',
+  fan: 'fan',
+  plug: 'plug',
+  dimmer: 'dimmer',
+  curtain: 'curtain',
+  doorbell: 'bell',
+};
+
+/**
+ * Icon for a device, driven by its decoded product code when available so a
+ * curtain controller or doorbell never shows up as a generic switch.
+ */
+export const getDeviceIconForDevice = (device: DeviceInfo): IconName => {
+  const { channels } = resolveDeviceProfile(device);
+  if (channels.length) {
+    const kinds = new Set(channels.map(channel => channel.kind));
+    if (kinds.size === 1) {
+      return ICON_BY_CHANNEL_KIND[channels[0].kind];
+    }
+    return 'switch';
+  }
+  return getDeviceIcon(device.name);
+};
+
 export const getDeviceTint = (icon: IconName): string => {
   switch (icon) {
     case 'bulb':
+    case 'dimmer':
       return colors.cta;
     case 'thermostat':
     case 'fan':
       return '#38BDF8';
     case 'camera':
       return '#A78BFA';
+    case 'curtain':
+      return colors.gradPrimaryEnd;
+    case 'bell':
+      return colors.passwordLock;
     case 'plug':
     case 'socket':
       return colors.secondary;
@@ -83,6 +114,12 @@ export const getDeviceTint = (icon: IconName): string => {
 };
 
 export const getDeviceHomeSection = (device: DeviceInfo): HomeDeviceSection => {
+  const profile = resolveDeviceProfile(device);
+  if (profile.channels.length) {
+    const kinds = new Set(profile.channels.map(channel => channel.kind));
+    return kinds.size === 1 && kinds.has('plug') ? 'plug' : 'switch';
+  }
+
   if (
     device.deviceType === DEVICE_TYPE_SMART_SWITCH ||
     (device.digitalPins?.length ?? 0) > 0

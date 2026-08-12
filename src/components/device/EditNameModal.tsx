@@ -81,6 +81,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 340,
+    minWidth: 300,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.xxl,
     overflow: 'hidden',

@@ -42,7 +42,10 @@ export type DeviceInfo = {
   readonly deviceType?: number;
   readonly meshId?: string;
   readonly digitalPins?: readonly DigitalPin[];
+  readonly pwmPins?: readonly PwmPin[];
   readonly lastSeen?: string | null;
+  /** Jacobian product code (eJS5F1P1, eJC2, ...) when the backend reports one */
+  readonly jacobianCode?: string;
 };
 
 export type DeviceCommandType = 'SET_PIN' | 'SET_PWM';

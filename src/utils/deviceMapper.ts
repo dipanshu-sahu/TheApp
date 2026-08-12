@@ -29,6 +29,7 @@ export const mapApiDeviceToDeviceInfo = (api: ApiDevice): DeviceInfo => ({
   deviceType: api.deviceType,
   meshId: api.meshId,
   digitalPins: api.digitalPins ?? [],
+  pwmPins: api.pwmPins ?? [],
   lastSeen: api.lastSeen,
 });
 

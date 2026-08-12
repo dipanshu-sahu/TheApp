@@ -9,8 +9,9 @@ import { colors } from '../themes/colors';
 import { AppDispatch, RootState } from '../store/store';
 import { fetchDeviceById } from '../slices/deviceSlice';
 import { getDeviceHomeSection } from '../utils/deviceDisplay';
+import { resolveDeviceProfile } from '../utils/jacobianCode';
 import { getMockDeviceById } from '../mocks/homeDevices';
-import SwitchDeviceDetail from '../components/device/SwitchDeviceDetail';
+import JacobianDeviceDetail from '../components/device/JacobianDeviceDetail';
 import LightDeviceDetail from '../components/device/LightDeviceDetail';
 import PlugDeviceDetail from '../components/device/PlugDeviceDetail';
 import { MyHomeStackParamList } from '../navigation';
@@ -36,6 +37,11 @@ const Device: React.FC = () => {
   const isLoading = !mockDevice && isLoadingDetails;
   const deviceType = useMemo(
     () => (device ? getDeviceHomeSection(device) : 'light'),
+    [device],
+  );
+  /** Product code decides the control layout; legacy devices fall back by type. */
+  const profile = useMemo(
+    () => (device ? resolveDeviceProfile(device) : null),
     [device],
   );
 
@@ -64,9 +70,11 @@ const Device: React.FC = () => {
   }
 
   const renderDetail = (): React.ReactNode => {
+    if (profile?.channels.length) {
+      return <JacobianDeviceDetail device={device} onClose={handleClose} />;
+    }
+
     switch (deviceType) {
-      case 'switch':
-        return <SwitchDeviceDetail device={device} onClose={handleClose} />;
       case 'plug':
         return <PlugDeviceDetail device={device} onClose={handleClose} />;
       case 'light':
